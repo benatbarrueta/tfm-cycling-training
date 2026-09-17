@@ -1,0 +1,12 @@
+from app.models.cyclist import Level
+
+
+COLD_START_ESTIMATED_IF = {
+    Level.BEGINNER: 0.55,
+    Level.INTERMEDIATE: 0.60,
+    Level.ADVANCED: 0.65,
+}
+
+
+MIN_ACTIVITIES_CURRENT_WEEK = 2
+MIN_ACTIVITIES_PREVIOUS_WEEK = 2
