@@ -5,6 +5,9 @@ from app.data.evaluation import (
     split_by_athlete,
     evaluate_persistence,
     evaluate_rolling_mean,
+    build_athlete_folds,
+    cross_validate_by_athlete,
+    is_outside_training_mean_range,
 )
 
 
@@ -87,3 +90,85 @@ def test_evaluate_rolling_mean():
 def test_evaluate_rolling_mean_with_empty_list():
     with pytest.raises(ValueError):
         evaluate_rolling_mean([])
+
+def test_build_athlete_folds():
+    rows = [
+        {"athlete_id": "a"},
+        {"athlete_id": "a"},
+        {"athlete_id": "b"},
+        {"athlete_id": "c"},
+    ]
+
+    folds = build_athlete_folds(rows)
+
+    assert len(folds) == 3
+
+    validated_ids = []
+
+    for train_fold, validation_fold in folds:
+        train_ids = {row["athlete_id"] for row in train_fold}
+        validation_ids = {
+            row["athlete_id"] for row in validation_fold
+        }
+
+        assert len(validation_ids) == 1
+        assert train_ids.isdisjoint(validation_ids)
+        assert len(train_fold) + len(validation_fold) == len(rows)
+
+        validated_ids.extend(validation_ids)
+
+    assert sorted(validated_ids) == ["a", "b", "c"]
+
+def test_build_athlete_folds_with_insufficient_athletes():
+    rows = [
+        {"athlete_id": "a"},
+    ]
+
+    with pytest.raises(ValueError):
+        build_athlete_folds(rows)
+
+def test_cross_validate_by_athlete():
+    rows = [
+        {
+            "athlete_id": athlete_id,
+            "tss_latest": tss,
+            "tss_previous": 100,
+            "tss_mean_4w": 100,
+            "next_week_tss": 2 * tss + 10,
+        }
+        for athlete_id in ["a", "b"]
+        for tss in [100, 200, 300]
+    ]
+
+    results = cross_validate_by_athlete(rows)
+
+    assert len(results) == 2
+    assert {result["athlete_id"] for result in results} == {"a", "b"}
+
+    for result in results:
+        assert result["n_rows"] == 3
+        assert result["persistence_mae"] == pytest.approx(210.0)
+        assert result["rolling_mean_mae"] == pytest.approx(310.0)
+        assert result["linear_mae"] == pytest.approx(0.0, abs=1e-8)
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (50, True),
+        (100, False),
+        (200, False),
+        (300, False),
+        (350, True),
+    ],
+)
+def test_is_outside_training_mean_range(value, expected):
+    train_rows = [
+        {"tss_mean_4w": "100"},
+        {"tss_mean_4w": "300"},
+    ]
+    row = {"tss_mean_4w": str(value)}
+
+    result = is_outside_training_mean_range(train_rows, row)
+
+    assert result is expected
+
