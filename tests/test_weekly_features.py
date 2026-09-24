@@ -7,7 +7,8 @@ from app.data.weekly_features import (
     group_rows_by_athlete,
     has_four_consecutive_weeks,
     build_feature_rows,
-    build_labeled_rows,   
+    build_labeled_rows,
+    build_volume_features,
 )   
 
 def test_tss_increase():
@@ -76,9 +77,10 @@ def test_build_tss_features_rejects_negative_tss(position):
 def test_load_weekly_rows(tmp_path):
     csv_path = tmp_path / "weekly.csv"
     csv_path.write_text(
-        "athlete_id,week_start,weekly_tss,usable_load_week\n"
-        "athlete_a,2026-01-05,150.5,True\n"
-        "athlete_a,2026-01-12,,False\n",
+        "athlete_id,week_start,weekly_tss,usable_load_week,"
+        "observed_duration_minutes,activity_count,training_days\n"
+        "athlete_a,2026-01-05,150.5,True,180,3,2\n"
+        "athlete_a,2026-01-12,,False,,0,0\n",
         encoding="utf-8",
     )
 
@@ -291,3 +293,76 @@ def test_build_labeled_rows_validates_target(
 
     if expected_count:
         assert result[0]["next_week_tss"] == 0
+
+def test_build_volume_features():
+    window = [
+        {
+            "observed_duration_minutes": minutes,
+            "activity_count": activities,
+            "training_days": days,
+        }
+        for minutes, activities, days in [
+            (120, 2, 2),
+            (180, 3, 2),
+            (240, 4, 3),
+            (300, 5, 4),
+        ]
+    ]
+
+    result = build_volume_features(window)
+
+    assert result == pytest.approx({
+        "hours_latest": 5.0,
+        "hours_mean_4w": 3.5,
+        "activities_latest": 5,
+        "activities_mean_4w": 3.5,
+        "training_days_latest": 4,
+        "training_days_mean_4w": 2.75,
+    })
+
+def test_build_volume_features_invalid_duration():
+    window = [
+        {
+            "observed_duration_minutes": minutes,
+            "activity_count": activities,
+            "training_days": days,
+        }
+        for minutes, activities, days in [
+            (120, 2, 2),
+            (None, 3, 2),
+            (240, 4, 3),
+            (300, 5, 4),
+        ]
+    ]
+
+    with pytest.raises(ValueError):
+        build_volume_features(window)
+
+def test_build_labeled_rows_includes_historical_volume():
+    rows = [
+        {
+            "athlete_id": "a",
+            "week_start": week,
+            "weekly_tss": tss,
+            "usable_load_week": True,
+            "observed_duration_minutes": minutes,
+            "activity_count": activities,
+            "training_days": days,
+        }
+        for week, tss, minutes, activities, days in [
+            ("2026-01-05", 100, 120, 2, 2),
+            ("2026-01-12", 150, 180, 3, 2),
+            ("2026-01-19", 200, 240, 4, 3),
+            ("2026-01-26", 250, 300, 5, 4),
+            ("2026-02-02", 400, 900, 10, 7),
+        ]
+    ]
+
+    result = build_labeled_rows(rows, include_volume=True)
+
+    assert len(result) == 1
+    assert result[0]["hours_latest"] == pytest.approx(5.0)
+    assert result[0]["hours_mean_4w"] == pytest.approx(3.5)
+    assert result[0]["activities_latest"] == 5
+    assert result[0]["training_days_latest"] == 4
+    assert result[0]["next_week_tss"] == 400

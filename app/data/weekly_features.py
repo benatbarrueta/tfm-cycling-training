@@ -46,6 +46,14 @@ def load_weekly_rows(path: str | Path) -> list[dict]:
             row["usable_load_week"] = row["usable_load_week"] == "True"
             rows.append(row)
 
+            duration = row["observed_duration_minutes"]
+            row["observed_duration_minutes"] = (
+                float(duration) if duration else None
+            )
+
+            row["activity_count"] = int(row["activity_count"])
+            row["training_days"] = int(row["training_days"])
+
     return rows
 
 def group_rows_by_athlete(rows: list[dict]) -> dict[str, list[dict]]:
@@ -84,7 +92,9 @@ def has_four_consecutive_weeks(rows: list[dict]) -> bool:
 
     return True
 
-def build_feature_rows(rows: list[dict]) -> list[dict]:
+def build_feature_rows(rows: list[dict],
+                        *,
+                        include_volume: bool = False) -> list[dict]:
     """Genera variables para ventanas de cuatro semanas válidas."""
     feature_rows = []
     grouped = group_rows_by_athlete(rows)
@@ -103,6 +113,16 @@ def build_feature_rows(rows: list[dict]) -> list[dict]:
                 continue
 
             features = build_tss_features([row["weekly_tss"] for row in window])
+
+            if include_volume:
+                if any(
+                    row["observed_duration_minutes"] is None
+                    for row in window
+                ):
+                    continue
+
+                features.update(build_volume_features(window))
+
             feature_rows.append({
                 "athlete_id": athlete_id,
                 "window_start": window[0]["week_start"],
@@ -112,9 +132,11 @@ def build_feature_rows(rows: list[dict]) -> list[dict]:
 
     return feature_rows
 
-def build_labeled_rows(rows: list[dict]) -> list[dict]:
+def build_labeled_rows(rows: list[dict], 
+                        *,
+                        include_volume: bool = False) -> list[dict]:
     """Añade el TSS observado de la semana siguiente a cada ventana."""
-    feature_rows = build_feature_rows(rows)
+    feature_rows = build_feature_rows(rows, include_volume=include_volume)
 
     weekly_lookup = {
         (row["athlete_id"], row["week_start"]): row
@@ -150,6 +172,30 @@ def build_labeled_rows(rows: list[dict]) -> list[dict]:
 
     return labeled_rows
 
+def build_volume_features(window: list[dict]) -> dict[str, float]:
+    """Resume volumen y frecuencia de cuatro semanas ordenadas."""
+    if len(window) != 4:
+        raise ValueError("Se requieren exactamente cuatro semanas.")
+
+    if any(row["observed_duration_minutes"] is None for row in window):
+        raise ValueError("Faltan datos de duración.")
+
+    hours = [
+        row["observed_duration_minutes"] / 60
+        for row in window
+    ]
+    activities = [row["activity_count"] for row in window]
+    training_days = [row["training_days"] for row in window]
+
+    return {
+        "hours_latest": hours[-1],
+        "hours_mean_4w": sum(hours) / len(hours),
+        "activities_latest": activities[-1],
+        "activities_mean_4w": sum(activities) / len(activities),
+        "training_days_latest": training_days[-1],
+        "training_days_mean_4w": sum(training_days) / len(training_days),
+    }
+
 def main():
     import argparse
 
@@ -163,14 +209,25 @@ def main():
         action="store_true",
         help="Incluye el TSS observado de la semana siguiente.",
     )
+    parser.add_argument(
+        "--include-volume",
+        action="store_true",
+        help="Incluye variables de horas, actividades y días entrenados.",
+    )
     args = parser.parse_args()
 
     rows = load_weekly_rows(args.input)
     
     if args.with_target:
-        features = build_labeled_rows(rows)
+        features = build_labeled_rows(
+            rows,
+            include_volume=args.include_volume,
+        )
     else:
-        features = build_feature_rows(rows)
+        features = build_feature_rows(
+            rows,
+            include_volume=args.include_volume,
+        )
 
     if not features:
         print("No se encontraron ventanas válidas.")
