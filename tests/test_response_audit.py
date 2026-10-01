@@ -34,6 +34,17 @@ from app.data.response_audit import (
     build_decoupling_comparison,
     collect_athlete_decoupling_comparisons,
     save_decoupling_comparisons,
+    summarize_decoupling_halves,
+    summarize_segment_stability,
+    is_eligible_decoupling_response,
+    filter_eligible_decoupling_comparisons,
+    build_response_session_features,
+    summarize_prior_load,
+    build_response_history_features,
+    has_prior_history_span,
+    build_response_dataset_row,
+    build_athlete_response_rows,
+    save_response_dataset,
 )
 
 
@@ -567,6 +578,19 @@ def test_collect_athlete_decoupling_comparisons(tmp_path):
         zip_path
     )
 
+    expected_mean_power = (
+        601 * 200 + 600 * 180
+    ) / 1201
+
+    expected_power_variance = (
+        601 * (200 - expected_mean_power) ** 2
+        + 600 * (180 - expected_mean_power) ** 2
+    ) / 1201
+
+    expected_power_standard_deviation = (
+        expected_power_variance ** 0.5
+    )
+
     assert len(result) == 1
 
     assert result[0] == {
@@ -578,6 +602,24 @@ def test_collect_athlete_decoupling_comparisons(tmp_path):
         "difference": pytest.approx(2.0),
         "continuous_duration_seconds": 1200,
         "paired_sample_count": 1201,
+        "first_half_power": pytest.approx(200.0),
+        "second_half_power": pytest.approx(180.0),
+        "first_half_hr": pytest.approx(100.0),
+        "second_half_hr": pytest.approx(100.0),
+        "first_half_ratio": pytest.approx(2.0),
+        "second_half_ratio": pytest.approx(1.8),
+        "mean_power": pytest.approx(
+            expected_mean_power
+        ),
+        "power_standard_deviation": pytest.approx(
+            expected_power_standard_deviation
+        ),
+        "power_cv": pytest.approx(
+            expected_power_standard_deviation
+            / expected_mean_power
+        ),
+        "zero_power_fraction": pytest.approx(0.0),
+        "power_balance_ratio": pytest.approx(0.9),
     }
 
 def test_summarize_time_axis():
@@ -766,6 +808,17 @@ def test_build_activity_response():
     assert result == {
         "continuous_duration_seconds": 3,
         "paired_sample_count": 4,
+        "first_half_power": pytest.approx(200.0),
+        "second_half_power": pytest.approx(180.0),
+        "first_half_hr": pytest.approx(100.0),
+        "second_half_hr": pytest.approx(100.0),
+        "first_half_ratio": pytest.approx(2.0),
+        "second_half_ratio": pytest.approx(1.8),
+        "mean_power": pytest.approx(190.0),
+        "power_standard_deviation": pytest.approx(10.0),
+        "power_cv": pytest.approx(10 / 190),
+        "zero_power_fraction": pytest.approx(0.0),
+        "power_balance_ratio": pytest.approx(0.9),
         "aerobic_decoupling": pytest.approx(10.0),
     }
 
@@ -817,6 +870,17 @@ def test_build_decoupling_comparison():
         "difference": pytest.approx(2.0),
         "continuous_duration_seconds": 3,
         "paired_sample_count": 4,
+        "first_half_power": pytest.approx(200.0),
+        "second_half_power": pytest.approx(180.0),
+        "first_half_hr": pytest.approx(100.0),
+        "second_half_hr": pytest.approx(100.0),
+        "first_half_ratio": pytest.approx(2.0),
+        "second_half_ratio": pytest.approx(1.8),
+        "mean_power": pytest.approx(190.0),
+        "power_standard_deviation": pytest.approx(10.0),
+        "power_cv": pytest.approx(10 / 190),
+        "zero_power_fraction": pytest.approx(0.0),
+        "power_balance_ratio": pytest.approx(0.9),
     }
 
 def test_build_decoupling_comparison_without_reported_value():
@@ -862,6 +926,17 @@ def test_save_decoupling_comparisons(tmp_path):
             "difference": 2.0,
             "continuous_duration_seconds": 1200,
             "paired_sample_count": 1201,
+            "first_half_power": 200.0,
+            "second_half_power": 180.0,
+            "first_half_hr": 100.0,
+            "second_half_hr": 100.0,
+            "first_half_ratio": 2.0,
+            "second_half_ratio": 1.8,
+            "mean_power": 190.0,
+            "power_standard_deviation": 10.0,
+            "power_cv": 10 / 190,
+            "zero_power_fraction": 0.0,
+            "power_balance_ratio": 0.9,
         },
     ]
 
@@ -886,6 +961,17 @@ def test_save_decoupling_comparisons(tmp_path):
             "difference": "2.0",
             "continuous_duration_seconds": "1200",
             "paired_sample_count": "1201",
+            "first_half_power": "200.0",
+            "second_half_power": "180.0",
+            "first_half_hr": "100.0",
+            "second_half_hr": "100.0",
+            "first_half_ratio": "2.0",
+            "second_half_ratio": "1.8",
+            "mean_power": "190.0",
+            "power_standard_deviation": "10.0",
+            "power_cv": str(10 / 190),
+            "zero_power_fraction": "0.0",
+            "power_balance_ratio": "0.9",
         },
     ]
 
@@ -898,4 +984,640 @@ def test_save_decoupling_comparisons_rejects_empty_list(
         save_decoupling_comparisons(
             [],
             output,
+        )
+
+def test_summarize_decoupling_halves():
+    segment = [
+        {"secs": "0", "power": "200", "hr": "100"},
+        {"secs": "1", "power": "200", "hr": "100"},
+        {"secs": "2", "power": "180", "hr": "100"},
+        {"secs": "3", "power": "180", "hr": "100"},
+    ]
+
+    result = summarize_decoupling_halves(segment)
+
+    assert result == {
+        "first_half_power": pytest.approx(200.0),
+        "second_half_power": pytest.approx(180.0),
+        "first_half_hr": pytest.approx(100.0),
+        "second_half_hr": pytest.approx(100.0),
+        "first_half_ratio": pytest.approx(2.0),
+        "second_half_ratio": pytest.approx(1.8),
+    }
+
+def test_summarize_segment_stability():
+    segment = [
+        {"secs": "0", "power": "200", "hr": "100"},
+        {"secs": "1", "power": "200", "hr": "100"},
+        {"secs": "2", "power": "180", "hr": "100"},
+        {"secs": "3", "power": "180", "hr": "100"},
+    ]
+
+    result = summarize_segment_stability(segment)
+
+    assert result == {
+        "mean_power": pytest.approx(190.0),
+        "power_standard_deviation": pytest.approx(10.0),
+        "power_cv": pytest.approx(10 / 190),
+        "zero_power_fraction": pytest.approx(0.0),
+        "power_balance_ratio": pytest.approx(0.9),
+    }
+
+def test_summarize_segment_stability_empty():
+    with pytest.raises(ValueError):
+        summarize_segment_stability([])
+
+def test_is_eligible_decoupling_response():
+    response = {
+        "power_cv": 0.50,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+
+    assert is_eligible_decoupling_response(response)
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("power_cv", 0.76),
+        ("zero_power_fraction", 0.21),
+        ("power_balance_ratio", 0.79),
+    ],
+)
+def test_is_eligible_decoupling_response_rejects_unstable_activity(
+    field,
+    value,
+):
+    response = {
+        "power_cv": 0.50,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+    response[field] = value
+
+    assert not is_eligible_decoupling_response(response)
+
+def test_is_eligible_decoupling_response_validates_thresholds():
+    response = {
+        "power_cv": 0.50,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+
+    with pytest.raises(ValueError):
+        is_eligible_decoupling_response(
+            response,
+            max_power_cv=-0.1,
+        )
+
+    with pytest.raises(ValueError):
+        is_eligible_decoupling_response(
+            response,
+            max_zero_power_fraction=1.1,
+        )
+
+    with pytest.raises(ValueError):
+        is_eligible_decoupling_response(
+            response,
+            min_power_balance_ratio=-0.1,
+        )
+
+def test_filter_eligible_decoupling_comparisons():
+    eligible = {
+        "ride_date": "2026/01/01 10:00:00 UTC",
+        "power_cv": 0.50,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+
+    rejected = {
+        "ride_date": "2026/01/02 10:00:00 UTC",
+        "power_cv": 0.90,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+
+    result = filter_eligible_decoupling_comparisons([
+        eligible,
+        rejected,
+    ])
+
+    assert result == [eligible]
+
+def test_filter_eligible_decoupling_comparisons_empty():
+    assert filter_eligible_decoupling_comparisons([]) == []
+
+def test_build_response_session_features():
+    ride = {
+        "METRICS": {
+            "workout_time": "3600",
+            "coggan_if": ["0.75", "3600"],
+            "coggan_tss": "56.25",
+        },
+    }
+
+    result = build_response_session_features(ride)
+
+    assert result == {
+        "session_duration_minutes": pytest.approx(60.0),
+        "session_intensity_factor": pytest.approx(0.75),
+        "session_tss": pytest.approx(56.25),
+    }
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("workout_time", ""),
+        ("workout_time", "0"),
+        ("coggan_if", ""),
+        ("coggan_if", "0"),
+        ("coggan_tss", ""),
+        ("coggan_tss", "-1"),
+    ],
+)
+def test_build_response_session_features_rejects_invalid_metrics(
+    field,
+    value,
+):
+    metrics = {
+        "workout_time": "3600",
+        "coggan_if": "0.75",
+        "coggan_tss": "56.25",
+    }
+    metrics[field] = value
+
+    assert build_response_session_features({
+        "METRICS": metrics,
+    }) is None
+
+def test_summarize_prior_load():
+    rides = [
+        {
+            "date": "2026/01/03 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {"coggan_tss": "50"},
+        },
+        {
+            "date": "2026/01/08 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {"coggan_tss": "70"},
+        },
+        {
+            "date": "2026/01/09 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {},
+        },
+        {
+            "date": "2026/01/09 12:00:00 UTC",
+            "sport": "Run",
+            "METRICS": {"coggan_tss": "100"},
+        },
+        {
+            "date": "2026/01/11 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {"coggan_tss": "200"},
+        },
+    ]
+
+    result = summarize_prior_load(
+        rides,
+        "2026/01/10 10:00:00 UTC",
+        days=7,
+    )
+
+    assert result == {
+        "observed_tss": pytest.approx(120.0),
+        "activity_count": 3,
+        "tss_coverage": pytest.approx(2 / 3),
+    }
+
+def test_summarize_prior_load_without_activities():
+    result = summarize_prior_load(
+        [],
+        "2026/01/10 10:00:00 UTC",
+        days=7,
+    )
+
+    assert result == {
+        "observed_tss": 0,
+        "activity_count": 0,
+        "tss_coverage": 1.0,
+    }
+
+def test_summarize_prior_load_rejects_invalid_days():
+    with pytest.raises(ValueError):
+        summarize_prior_load(
+            [],
+            "2026/01/10 10:00:00 UTC",
+            days=0,
+        )
+
+def test_build_response_history_features():
+    rides = [
+        {
+            "date": "2025/12/20 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {"coggan_tss": "40"},
+        },
+        {
+            "date": "2026/01/05 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {"coggan_tss": "50"},
+        },
+        {
+            "date": "2026/01/08 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {"coggan_tss": "70"},
+        },
+        {
+            "date": "2026/01/09 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {},
+        },
+    ]
+
+    result = build_response_history_features(
+        rides,
+        "2026/01/10 10:00:00 UTC",
+    )
+
+    assert result == {
+        "previous_7d_tss": pytest.approx(120.0),
+        "previous_7d_activity_count": 3,
+        "previous_7d_tss_coverage": pytest.approx(2 / 3),
+        "previous_28d_tss": pytest.approx(160.0),
+        "previous_28d_activity_count": 4,
+        "previous_28d_tss_coverage": pytest.approx(3 / 4),
+    }
+
+def test_build_response_history_excludes_target_activity():
+    rides = [
+        {
+            "date": "2026/01/10 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {"coggan_tss": "100"},
+        },
+    ]
+
+    result = build_response_history_features(
+        rides,
+        "2026/01/10 10:00:00 UTC",
+    )
+
+    assert result["previous_7d_tss"] == 0
+    assert result["previous_28d_tss"] == 0
+
+def test_has_prior_history_span():
+    rides = [
+        {
+            "date": "2025/12/01 10:00:00 UTC",
+            "sport": "Bike",
+        },
+        {
+            "date": "2026/01/05 10:00:00 UTC",
+            "sport": "Bike",
+        },
+    ]
+
+    assert has_prior_history_span(
+        rides,
+        "2026/01/10 10:00:00 UTC",
+        days=28,
+    )
+
+def test_has_prior_history_span_rejects_short_history():
+    rides = [
+        {
+            "date": "2026/01/05 10:00:00 UTC",
+            "sport": "Bike",
+        },
+    ]
+
+    assert not has_prior_history_span(
+        rides,
+        "2026/01/10 10:00:00 UTC",
+        days=28,
+    )
+
+def test_has_prior_history_span_ignores_future_rides():
+    rides = [
+        {
+            "date": "2026/02/01 10:00:00 UTC",
+            "sport": "Bike",
+        },
+    ]
+
+    assert not has_prior_history_span(
+        rides,
+        "2026/01/10 10:00:00 UTC",
+        days=28,
+    )
+
+def test_has_prior_history_span_rejects_invalid_days():
+    with pytest.raises(ValueError):
+        has_prior_history_span(
+            [],
+            "2026/01/10 10:00:00 UTC",
+            days=0,
+        )
+
+def test_build_response_dataset_row():
+    historical_ride = {
+        "date": "2025/12/01 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "coggan_tss": "40",
+        },
+    }
+
+    recent_ride = {
+        "date": "2026/01/05 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "coggan_tss": "50",
+        },
+    }
+
+    target_ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "workout_time": "3600",
+            "coggan_if": "0.75",
+            "coggan_tss": "56.25",
+        },
+    }
+
+    rides = [
+        historical_ride,
+        recent_ride,
+        target_ride,
+    ]
+
+    comparison = {
+        "reported_decoupling": 8.0,
+        "power_cv": 0.50,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+
+    result = build_response_dataset_row(
+        "athlete-a",
+        rides,
+        target_ride,
+        comparison,
+    )
+
+    assert result == {
+        "athlete_id": "athlete-a",
+        "activity_date": "2026/01/10 10:00:00 UTC",
+        "session_duration_minutes": pytest.approx(60.0),
+        "session_intensity_factor": pytest.approx(0.75),
+        "session_tss": pytest.approx(56.25),
+        "previous_7d_tss": pytest.approx(50.0),
+        "previous_7d_activity_count": 1,
+        "previous_7d_tss_coverage": pytest.approx(1.0),
+        "previous_28d_tss": pytest.approx(50.0),
+        "previous_28d_activity_count": 1,
+        "previous_28d_tss_coverage": pytest.approx(1.0),
+        "target_aerobic_decoupling": pytest.approx(8.0),
+    }
+
+def test_build_response_dataset_row_rejects_incomplete_history():
+    old_ride = {
+        "date": "2025/12/01 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "coggan_tss": "40",
+        },
+    }
+
+    incomplete_ride = {
+        "date": "2026/01/05 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {},
+    }
+
+    target_ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "workout_time": "3600",
+            "coggan_if": "0.75",
+            "coggan_tss": "56.25",
+        },
+    }
+
+    comparison = {
+        "reported_decoupling": 8.0,
+        "power_cv": 0.50,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+
+    assert build_response_dataset_row(
+        "athlete-a",
+        [
+            old_ride,
+            incomplete_ride,
+            target_ride,
+        ],
+        target_ride,
+        comparison,
+    ) is None
+
+def test_build_response_dataset_row_rejects_ineligible_response():
+    ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {},
+    }
+
+    comparison = {
+        "reported_decoupling": 8.0,
+        "power_cv": 0.90,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+
+    assert build_response_dataset_row(
+        "athlete-a",
+        [],
+        ride,
+        comparison,
+    ) is None
+
+def test_build_response_dataset_row_rejects_short_history():
+    ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "workout_time": "3600",
+            "coggan_if": "0.75",
+            "coggan_tss": "56.25",
+        },
+    }
+
+    comparison = {
+        "reported_decoupling": 8.0,
+        "power_cv": 0.50,
+        "zero_power_fraction": 0.10,
+        "power_balance_ratio": 0.90,
+    }
+
+    assert build_response_dataset_row(
+        "athlete-a",
+        [ride],
+        ride,
+        comparison,
+    ) is None
+
+def test_build_athlete_response_rows():
+    historical_ride = {
+        "date": "2025/12/01 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "coggan_tss": "40",
+        },
+    }
+
+    recent_ride = {
+        "date": "2026/01/05 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "coggan_tss": "50",
+        },
+    }
+
+    target_ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "workout_time": "3600",
+            "coggan_if": "0.75",
+            "coggan_tss": "56.25",
+        },
+    }
+
+    data = {
+        "ATHLETE": {
+            "id": "{athlete-a}",
+        },
+        "RIDES": [
+            historical_ride,
+            recent_ride,
+            target_ride,
+        ],
+    }
+
+    comparisons = [
+        {
+            "ride_date": "2026/01/10 10:00:00 UTC",
+            "reported_decoupling": 8.0,
+            "power_cv": 0.50,
+            "zero_power_fraction": 0.10,
+            "power_balance_ratio": 0.90,
+        },
+    ]
+
+    result = build_athlete_response_rows(
+        data,
+        comparisons,
+    )
+
+    assert len(result) == 1
+    assert result[0]["athlete_id"] == "athlete-a"
+    assert result[0]["activity_date"] == (
+        "2026/01/10 10:00:00 UTC"
+    )
+    assert result[0]["target_aerobic_decoupling"] == (
+        pytest.approx(8.0)
+    )
+    assert result[0]["previous_7d_tss"] == pytest.approx(50.0)
+
+def test_build_athlete_response_rows_skips_duplicate_dates():
+    duplicate_ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {},
+    }
+
+    data = {
+        "ATHLETE": {"id": "{athlete-a}"},
+        "RIDES": [
+            duplicate_ride,
+            duplicate_ride.copy(),
+        ],
+    }
+
+    comparisons = [
+        {
+            "ride_date": "2026/01/10 10:00:00 UTC",
+            "reported_decoupling": 8.0,
+            "power_cv": 0.50,
+            "zero_power_fraction": 0.10,
+            "power_balance_ratio": 0.90,
+        },
+    ]
+
+    assert build_athlete_response_rows(
+        data,
+        comparisons,
+    ) == []
+
+def test_save_response_dataset(tmp_path):
+    output = tmp_path / "response_dataset.csv"
+
+    rows = [
+        {
+            "athlete_id": "athlete-a",
+            "activity_date": "2026/01/10 10:00:00 UTC",
+            "session_duration_minutes": 60.0,
+            "session_intensity_factor": 0.75,
+            "session_tss": 56.25,
+            "previous_7d_tss": 50.0,
+            "previous_7d_activity_count": 1,
+            "previous_7d_tss_coverage": 1.0,
+            "previous_28d_tss": 150.0,
+            "previous_28d_activity_count": 3,
+            "previous_28d_tss_coverage": 1.0,
+            "target_aerobic_decoupling": 8.0,
+        },
+    ]
+
+    save_response_dataset(
+        rows,
+        output,
+    )
+
+    with output.open(
+        encoding="utf-8",
+        newline="",
+    ) as file:
+        saved_rows = list(csv.DictReader(file))
+
+    assert saved_rows == [
+        {
+            "athlete_id": "athlete-a",
+            "activity_date": "2026/01/10 10:00:00 UTC",
+            "session_duration_minutes": "60.0",
+            "session_intensity_factor": "0.75",
+            "session_tss": "56.25",
+            "previous_7d_tss": "50.0",
+            "previous_7d_activity_count": "1",
+            "previous_7d_tss_coverage": "1.0",
+            "previous_28d_tss": "150.0",
+            "previous_28d_activity_count": "3",
+            "previous_28d_tss_coverage": "1.0",
+            "target_aerobic_decoupling": "8.0",
+        },
+    ]
+
+def test_save_response_dataset_rejects_empty_rows(
+    tmp_path,
+):
+    with pytest.raises(ValueError):
+        save_response_dataset(
+            [],
+            tmp_path / "response_dataset.csv",
         )

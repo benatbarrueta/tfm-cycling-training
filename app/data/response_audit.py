@@ -869,33 +869,16 @@ def calculate_aerobic_decoupling(
     segment: list[dict],
 ) -> float | None:
     """Calcula el desacoplamiento potencia/FC entre ambas mitades."""
-    first_half, second_half = split_segment_by_time(segment)
+    halves = summarize_decoupling_halves(segment)
 
-    first_power = sum(
-        metric(sample.get("power"))
-        for sample in first_half
-    ) / len(first_half)
-
-    second_power = sum(
-        metric(sample.get("power"))
-        for sample in second_half
-    ) / len(second_half)
-
-    first_hr = sum(
-        metric(sample.get("hr"))
-        for sample in first_half
-    ) / len(first_half)
-
-    second_hr = sum(
-        metric(sample.get("hr"))
-        for sample in second_half
-    ) / len(second_half)
+    first_power = halves["first_half_power"]
+    second_power = halves["second_half_power"]
 
     if first_power <= 0 or second_power <= 0:
         return None
 
-    first_ratio = first_power / first_hr
-    second_ratio = second_power / second_hr
+    first_ratio = halves["first_half_ratio"]
+    second_ratio = halves["second_half_ratio"]
 
     return (
         100
@@ -992,7 +975,9 @@ def build_activity_response(
     if duration < min_duration_seconds:
         return None
 
+    halves = summarize_decoupling_halves(segment)
     decoupling = calculate_aerobic_decoupling(segment)
+    stability = summarize_segment_stability(segment)
 
     if decoupling is None:
         return None
@@ -1000,6 +985,8 @@ def build_activity_response(
     return {
         "continuous_duration_seconds": duration,
         "paired_sample_count": len(segment),
+        **halves,
+        **stability,
         "aerobic_decoupling": decoupling,
     }
 
@@ -1038,6 +1025,19 @@ def build_decoupling_comparison(
             response["continuous_duration_seconds"]
         ),
         "paired_sample_count": response["paired_sample_count"],
+        "first_half_power": response["first_half_power"],
+        "second_half_power": response["second_half_power"],
+        "first_half_hr": response["first_half_hr"],
+        "second_half_hr": response["second_half_hr"],
+        "first_half_ratio": response["first_half_ratio"],
+        "second_half_ratio": response["second_half_ratio"],
+        "mean_power": response["mean_power"],
+        "power_standard_deviation": (
+            response["power_standard_deviation"]
+        ),
+        "power_cv": response["power_cv"],
+        "zero_power_fraction": response["zero_power_fraction"],
+        "power_balance_ratio": response["power_balance_ratio"],
     }
 
 def save_decoupling_comparisons(
@@ -1065,22 +1065,445 @@ def save_decoupling_comparisons(
         writer.writeheader()
         writer.writerows(comparisons)
 
+def summarize_decoupling_halves(
+    segment: list[dict],
+) -> dict[str, float]:
+    """Resume potencia, FC y su relación en cada mitad."""
+    first_half, second_half = split_segment_by_time(segment)
+
+    first_power = sum(
+        metric(sample.get("power"))
+        for sample in first_half
+    ) / len(first_half)
+
+    second_power = sum(
+        metric(sample.get("power"))
+        for sample in second_half
+    ) / len(second_half)
+
+    first_hr = sum(
+        metric(sample.get("hr"))
+        for sample in first_half
+    ) / len(first_half)
+
+    second_hr = sum(
+        metric(sample.get("hr"))
+        for sample in second_half
+    ) / len(second_half)
+
+    return {
+        "first_half_power": first_power,
+        "second_half_power": second_power,
+        "first_half_hr": first_hr,
+        "second_half_hr": second_hr,
+        "first_half_ratio": (
+            first_power / first_hr
+        ),
+        "second_half_ratio": (
+            second_power / second_hr
+        ),
+    }
+
+def summarize_segment_stability(
+    segment: list[dict],
+) -> dict[str, float | None]:
+    """Resume la estabilidad de potencia del tramo seleccionado."""
+    if not segment:
+        raise ValueError(
+            "Se necesita un tramo con muestras."
+        )
+
+    powers = [
+        metric(sample.get("power"))
+        for sample in segment
+    ]
+
+    mean_power = sum(powers) / len(powers)
+
+    power_variance = sum(
+        (power - mean_power) ** 2
+        for power in powers
+    ) / len(powers)
+
+    power_standard_deviation = power_variance ** 0.5
+
+    power_cv = (
+        power_standard_deviation / mean_power
+        if mean_power > 0
+        else None
+    )
+
+    zero_power_fraction = (
+        sum(power == 0 for power in powers)
+        / len(powers)
+    )
+
+    halves = summarize_decoupling_halves(segment)
+    maximum_half_power = max(
+        halves["first_half_power"],
+        halves["second_half_power"],
+    )
+
+    power_balance_ratio = (
+        min(
+            halves["first_half_power"],
+            halves["second_half_power"],
+        )
+        / maximum_half_power
+        if maximum_half_power > 0
+        else None
+    )
+
+    return {
+        "mean_power": mean_power,
+        "power_standard_deviation": power_standard_deviation,
+        "power_cv": power_cv,
+        "zero_power_fraction": zero_power_fraction,
+        "power_balance_ratio": power_balance_ratio,
+    }
+
+def is_eligible_decoupling_response(
+    response: dict,
+    *,
+    max_power_cv: float = 0.75,
+    max_zero_power_fraction: float = 0.20,
+    min_power_balance_ratio: float = 0.80,
+) -> bool:
+    """Comprueba si una actividad es adecuada para estudiar desacoplamiento."""
+    if max_power_cv < 0:
+        raise ValueError(
+            "El CV máximo no puede ser negativo."
+        )
+
+    if not 0 <= max_zero_power_fraction <= 1:
+        raise ValueError(
+            "La fracción de potencia cero debe estar entre 0 y 1."
+        )
+
+    if not 0 <= min_power_balance_ratio <= 1:
+        raise ValueError(
+            "El equilibrio de potencia debe estar entre 0 y 1."
+        )
+
+    return (
+        response["power_cv"] <= max_power_cv
+        and response["zero_power_fraction"]
+        <= max_zero_power_fraction
+        and response["power_balance_ratio"]
+        >= min_power_balance_ratio
+    )
+
+def filter_eligible_decoupling_comparisons(
+    comparisons: list[dict],
+) -> list[dict]:
+    """Conserva las actividades adecuadas para estudiar desacoplamiento."""
+    return [
+        comparison
+        for comparison in comparisons
+        if is_eligible_decoupling_response(comparison)
+    ]
+
+def build_response_session_features(
+    ride: dict,
+) -> dict[str, float] | None:
+    """Extrae características de sesión utilizables antes de entrenar."""
+    metrics = ride.get("METRICS", {})
+
+    duration_seconds = metric(
+        metrics.get("workout_time")
+    )
+    intensity_factor = metric(
+        metrics.get("coggan_if")
+    )
+    session_tss = metric(
+        metrics.get("coggan_tss")
+    )
+
+    if (
+        duration_seconds is None
+        or duration_seconds <= 0
+        or intensity_factor is None
+        or intensity_factor <= 0
+        or session_tss is None
+        or session_tss < 0
+    ):
+        return None
+
+    return {
+        "session_duration_minutes": (
+            duration_seconds / 60
+        ),
+        "session_intensity_factor": intensity_factor,
+        "session_tss": session_tss,
+    }
+
+def summarize_prior_load(
+    rides: list[dict],
+    target_date: str,
+    *,
+    days: int,
+) -> dict[str, float | int]:
+    """Resume la carga registrada antes de una actividad objetivo."""
+    if days <= 0:
+        raise ValueError(
+            "El número de días debe ser mayor que cero."
+        )
+
+    target_datetime = datetime.strptime(
+        target_date,
+        "%Y/%m/%d %H:%M:%S UTC",
+    )
+    window_start = target_datetime - timedelta(
+        days=days,
+    )
+
+    previous_rides = []
+
+    for ride in rides:
+        if ride.get("sport") != "Bike":
+            continue
+
+        ride_datetime = datetime.strptime(
+            ride["date"],
+            "%Y/%m/%d %H:%M:%S UTC",
+        )
+
+        if window_start <= ride_datetime < target_datetime:
+            previous_rides.append(ride)
+
+    tss_values = [
+        metric(ride.get("METRICS", {}).get("coggan_tss"))
+        for ride in previous_rides
+    ]
+
+    available_tss = [
+        value
+        for value in tss_values
+        if value is not None
+    ]
+
+    activity_count = len(previous_rides)
+
+    tss_coverage = (
+        len(available_tss) / activity_count
+        if activity_count > 0
+        else 1.0
+    )
+
+    return {
+        "observed_tss": sum(available_tss),
+        "activity_count": activity_count,
+        "tss_coverage": tss_coverage,
+    }
+
+def build_response_history_features(
+    rides: list[dict],
+    target_date: str,
+) -> dict[str, float | int]:
+    """Construye variables de carga previas a una actividad."""
+    previous_7d = summarize_prior_load(
+        rides,
+        target_date,
+        days=7,
+    )
+    previous_28d = summarize_prior_load(
+        rides,
+        target_date,
+        days=28,
+    )
+
+    return {
+        "previous_7d_tss": previous_7d["observed_tss"],
+        "previous_7d_activity_count": (
+            previous_7d["activity_count"]
+        ),
+        "previous_7d_tss_coverage": (
+            previous_7d["tss_coverage"]
+        ),
+        "previous_28d_tss": previous_28d["observed_tss"],
+        "previous_28d_activity_count": (
+            previous_28d["activity_count"]
+        ),
+        "previous_28d_tss_coverage": (
+            previous_28d["tss_coverage"]
+        ),
+    }
+
+def has_prior_history_span(
+    rides: list[dict],
+    target_date: str,
+    *,
+    days: int = 28,
+) -> bool:
+    """Comprueba que existen datos desde antes del inicio de la ventana."""
+    if days <= 0:
+        raise ValueError(
+            "El número de días debe ser mayor que cero."
+        )
+
+    target_datetime = datetime.strptime(
+        target_date,
+        "%Y/%m/%d %H:%M:%S UTC",
+    )
+    required_start = target_datetime - timedelta(
+        days=days,
+    )
+
+    cycling_dates = [
+        datetime.strptime(
+            ride["date"],
+            "%Y/%m/%d %H:%M:%S UTC",
+        )
+        for ride in rides
+        if ride.get("sport") == "Bike"
+        and datetime.strptime(
+            ride["date"],
+            "%Y/%m/%d %H:%M:%S UTC",
+        ) < target_datetime
+    ]
+
+    return (
+        bool(cycling_dates)
+        and min(cycling_dates) <= required_start
+    )
+
+def build_response_dataset_row(
+    athlete_id: str,
+    rides: list[dict],
+    ride: dict,
+    comparison: dict,
+) -> dict | None:
+    """Construye una fila de aprendizaje para una actividad elegible."""
+    if not is_eligible_decoupling_response(comparison):
+        return None
+
+    target_date = ride["date"]
+
+    if not has_prior_history_span(
+        rides,
+        target_date,
+        days=28,
+    ):
+        return None
+
+    session_features = build_response_session_features(
+        ride
+    )
+
+    if session_features is None:
+        return None
+
+    history_features = build_response_history_features(
+        rides,
+        target_date,
+    )
+
+    if (
+        history_features["previous_7d_tss_coverage"] < 1
+        or history_features["previous_28d_tss_coverage"] < 1
+    ):
+        return None
+
+    return {
+        "athlete_id": athlete_id,
+        "activity_date": target_date,
+        **session_features,
+        **history_features,
+        "target_aerobic_decoupling": (
+            comparison["reported_decoupling"]
+        ),
+    }
+
+def build_athlete_response_rows(
+    data: dict,
+    comparisons: list[dict],
+) -> list[dict]:
+    """Construye las filas de respuesta de un atleta."""
+    athlete_id = str(
+        data["ATHLETE"]["id"]
+    ).strip("{}")
+
+    rides = data["RIDES"]
+    rides_by_date = {}
+
+    for ride in rides:
+        ride_date = ride["date"]
+
+        if ride_date not in rides_by_date:
+            rides_by_date[ride_date] = []
+
+        rides_by_date[ride_date].append(ride)
+
+    rows = []
+
+    for comparison in comparisons:
+        matching_rides = rides_by_date.get(
+            comparison["ride_date"],
+            [],
+        )
+
+        if len(matching_rides) != 1:
+            continue
+
+        row = build_response_dataset_row(
+            athlete_id,
+            rides,
+            matching_rides[0],
+            comparison,
+        )
+
+        if row is not None:
+            rows.append(row)
+
+    return rows
+
+def save_response_dataset(
+    rows: list[dict],
+    output: str | Path,
+) -> None:
+    """Guarda el dataset de respuesta en un CSV."""
+    if not rows:
+        raise ValueError(
+            "No hay filas de respuesta que guardar."
+        )
+
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    with output.open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=list(rows[0]),
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Cuenta actividades con potencia y frecuencia cardiaca."
+        description=(
+            "Audita señales de potencia y frecuencia cardiaca "
+            "y construye el dataset de respuesta."
+        )
     )
 
     parser.add_argument(
         "sources",
         nargs="+",
         type=Path,
-        help="Rutas a los resúmenes JSON de los atletas.",
+        help="Rutas a los resúmenes JSON o ZIP de los atletas.",
     )
 
     parser.add_argument(
         "--signal-coverage",
         action="store_true",
-        help="Analiza la cobertura de potencia y frecuencia cardiaca.",
+        help=(
+            "Analiza la cobertura de potencia y "
+            "frecuencia cardiaca."
+        ),
     )
 
     parser.add_argument(
@@ -1092,9 +1515,19 @@ def main():
         ),
     )
 
+    parser.add_argument(
+        "--response-output",
+        type=Path,
+        help=(
+            "Guarda el dataset de respuesta cardiovascular "
+            "preparado para ML."
+        ),
+    )
+
     args = parser.parse_args()
 
     all_comparisons = []
+    all_response_rows = []
 
     for path in args.sources:
         summary = audit_athlete_summary(path)
@@ -1102,151 +1535,176 @@ def main():
         print(
             f"Atleta {summary['athlete_id']}: "
             f"{summary['response_candidates']} candidatas de "
-            f"{summary['cycling_activities']} actividades de ciclismo"
+            f"{summary['cycling_activities']} "
+            f"actividades de ciclismo"
         )
 
-        if path.suffix.lower() == ".zip":
-            data = read_athlete_summary(path)
-            csv_names = list_activity_csvs(path)
+        if path.suffix.lower() != ".zip":
+            continue
 
-            offset_summary = summarize_activity_offsets(
+        data = read_athlete_summary(path)
+        csv_names = list_activity_csvs(path)
+
+        offset_summary = summarize_activity_offsets(
+            data["RIDES"],
+            csv_names,
+        )
+
+        print(
+            f"  CSV encontrados: {len(csv_names)} | "
+            f"emparejadas: "
+            f"{offset_summary['matched_activities']} | "
+            f"sin pareja: "
+            f"{offset_summary['unmatched_activities']} | "
+            f"ambiguas: "
+            f"{offset_summary['ambiguous_activities']}"
+        )
+
+        print(
+            f"  Desfases: "
+            f"{offset_summary['offset_counts']}"
+        )
+
+        if offset_summary["unmatched_activities"] > 0:
+            examples = collect_unmatched_examples(
                 data["RIDES"],
                 csv_names,
+                limit=5,
             )
 
-            print(
-                f"  CSV encontrados: {len(csv_names)} | "
-                f"emparejadas: "
-                f"{offset_summary['matched_activities']} | "
-                f"sin pareja: "
-                f"{offset_summary['unmatched_activities']} | "
-                f"ambiguas: "
-                f"{offset_summary['ambiguous_activities']}"
-            )
+            print("  Ejemplos sin coincidencia exacta:")
 
-            print(
-                f"  Desfases: "
-                f"{offset_summary['offset_counts']}"
-            )
+            for example in examples:
+                difference = example["difference_minutes"]
 
-            if offset_summary["unmatched_activities"] > 0:
-                examples = collect_unmatched_examples(
-                    data["RIDES"],
-                    csv_names,
-                    limit=5,
+                difference_text = (
+                    f"{difference:.2f} minutos"
+                    if difference is not None
+                    else "sin CSV disponible"
                 )
 
-                print("  Ejemplos sin coincidencia exacta:")
+                print(
+                    f"    JSON: "
+                    f"{example['ride_date_utc']} | "
+                    f"CSV cercano: "
+                    f"{example['nearest_csv']} | "
+                    f"diferencia: {difference_text}"
+                )
 
-                for example in examples:
-                    difference = example["difference_minutes"]
+        needs_comparisons = (
+            args.decoupling_output is not None
+            or args.response_output is not None
+        )
 
-                    difference_text = (
-                        f"{difference:.2f} minutos"
-                        if difference is not None
-                        else "sin CSV disponible"
-                    )
+        if needs_comparisons:
+            comparisons = (
+                collect_athlete_decoupling_comparisons(
+                    path
+                )
+            )
 
-                    print(
-                        f"    JSON: "
-                        f"{example['ride_date_utc']} | "
-                        f"CSV cercano: "
-                        f"{example['nearest_csv']} | "
-                        f"diferencia: {difference_text}"
-                    )
+            print(
+                "  Comparaciones de desacoplamiento válidas: "
+                f"{len(comparisons)}"
+            )
 
             if args.decoupling_output is not None:
-                comparisons = (
-                    collect_athlete_decoupling_comparisons(
-                        path
-                    )
-                )
                 all_comparisons.extend(comparisons)
 
-                print(
-                    "  Comparaciones de desacoplamiento válidas: "
-                    f"{len(comparisons)}"
+            if args.response_output is not None:
+                response_rows = build_athlete_response_rows(
+                    data,
+                    comparisons,
                 )
 
-            if args.signal_coverage:
-                coverage = audit_athlete_signal_coverage(path)
-
-                print("  Cobertura de señales:")
+                all_response_rows.extend(response_rows)
 
                 print(
-                    f"    candidatas: "
-                    f"{coverage['response_candidates']} | "
-                    f"emparejadas: "
-                    f"{coverage['matched_candidates']} | "
-                    f"sin pareja: "
-                    f"{coverage['missing_candidates']} | "
-                    f"ambiguas: "
-                    f"{coverage['ambiguous_candidates']} | "
-                    f"CSV inválidos: "
-                    f"{coverage['invalid_csv_candidates']} | "
-                    f"CSV vacíos: "
-                    f"{coverage['empty_csv_candidates']}"
+                    "  Filas elegibles para ML: "
+                    f"{len(response_rows)}"
                 )
 
-                print(
-                    f"    cobertura >= 50 %: "
-                    f"{coverage['coverage_at_least_50']} | "
-                    f">= 80 %: "
-                    f"{coverage['coverage_at_least_80']} | "
-                    f">= 90 %: "
-                    f"{coverage['coverage_at_least_90']}"
-                )
+        if args.signal_coverage:
+            coverage = audit_athlete_signal_coverage(
+                path
+            )
 
-                pooled = coverage["pooled_coverage"]
-                activity_median = coverage[
-                    "median_activity_coverage"
-                ]
+            print("  Cobertura de señales:")
 
-                pooled_text = (
-                    f"{pooled:.2%}"
-                    if pooled is not None
-                    else "sin datos"
-                )
+            print(
+                f"    candidatas: "
+                f"{coverage['response_candidates']} | "
+                f"emparejadas: "
+                f"{coverage['matched_candidates']} | "
+                f"sin pareja: "
+                f"{coverage['missing_candidates']} | "
+                f"ambiguas: "
+                f"{coverage['ambiguous_candidates']} | "
+                f"CSV inválidos: "
+                f"{coverage['invalid_csv_candidates']} | "
+                f"CSV vacíos: "
+                f"{coverage['empty_csv_candidates']}"
+            )
 
-                median_text = (
-                    f"{activity_median:.2%}"
-                    if activity_median is not None
-                    else "sin datos"
-                )
+            print(
+                f"    cobertura >= 50 %: "
+                f"{coverage['coverage_at_least_50']} | "
+                f">= 80 %: "
+                f"{coverage['coverage_at_least_80']} | "
+                f">= 90 %: "
+                f"{coverage['coverage_at_least_90']}"
+            )
 
-                print(
-                    f"    cobertura global: {pooled_text} | "
-                    f"mediana por actividad: {median_text}"
-                )
+            pooled = coverage["pooled_coverage"]
+            activity_median = coverage[
+                "median_activity_coverage"
+            ]
 
-                print(
-                    f"    duración >= 20 min: "
-                    f"{coverage['duration_at_least_20_minutes']} | "
-                    f">= 30 min: "
-                    f"{coverage['duration_at_least_30_minutes']} | "
-                    f">= 60 min: "
-                    f"{coverage['duration_at_least_60_minutes']}"
-                )
+            pooled_text = (
+                f"{pooled:.2%}"
+                if pooled is not None
+                else "sin datos"
+            )
 
-                print(
-                    f"    tiempo no creciente: "
-                    f"{coverage['activities_with_non_increasing_time']} | "
-                    f"con saltos > 5 s: "
-                    f"{coverage['activities_with_gap_over_5_seconds']} | "
-                    f"con saltos > 60 s: "
-                    f"{coverage['activities_with_gap_over_60_seconds']} | "
-                    f"sin tiempo válido: "
-                    f"{coverage['activities_without_valid_time']}"
-                )
+            median_text = (
+                f"{activity_median:.2%}"
+                if activity_median is not None
+                else "sin datos"
+            )
 
-                print(
-                    f"    tramo continuo >= 10 min: "
-                    f"{coverage['continuous_segment_at_least_10_minutes']} | "
-                    f">= 20 min: "
-                    f"{coverage['continuous_segment_at_least_20_minutes']} | "
-                    f">= 30 min: "
-                    f"{coverage['continuous_segment_at_least_30_minutes']}"
-                )
+            print(
+                f"    cobertura global: {pooled_text} | "
+                f"mediana por actividad: {median_text}"
+            )
+
+            print(
+                f"    duración >= 20 min: "
+                f"{coverage['duration_at_least_20_minutes']} | "
+                f">= 30 min: "
+                f"{coverage['duration_at_least_30_minutes']} | "
+                f">= 60 min: "
+                f"{coverage['duration_at_least_60_minutes']}"
+            )
+
+            print(
+                f"    tiempo no creciente: "
+                f"{coverage['activities_with_non_increasing_time']} | "
+                f"con saltos > 5 s: "
+                f"{coverage['activities_with_gap_over_5_seconds']} | "
+                f"con saltos > 60 s: "
+                f"{coverage['activities_with_gap_over_60_seconds']} | "
+                f"sin tiempo válido: "
+                f"{coverage['activities_without_valid_time']}"
+            )
+
+            print(
+                f"    tramo continuo >= 10 min: "
+                f"{coverage['continuous_segment_at_least_10_minutes']} | "
+                f">= 20 min: "
+                f"{coverage['continuous_segment_at_least_20_minutes']} | "
+                f">= 30 min: "
+                f"{coverage['continuous_segment_at_least_30_minutes']}"
+            )
 
     if args.decoupling_output is not None:
         save_decoupling_comparisons(
@@ -1259,8 +1717,23 @@ def main():
             f"{args.decoupling_output}"
         )
         print(
-            "Filas exportadas: "
+            "Filas de comparación exportadas: "
             f"{len(all_comparisons)}"
+        )
+
+    if args.response_output is not None:
+        save_response_dataset(
+            all_response_rows,
+            args.response_output,
+        )
+
+        print(
+            "\nDataset de respuesta guardado en: "
+            f"{args.response_output}"
+        )
+        print(
+            "Filas de respuesta exportadas: "
+            f"{len(all_response_rows)}"
         )
 
 if __name__ == "__main__":
