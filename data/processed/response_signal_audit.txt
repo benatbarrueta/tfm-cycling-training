@@ -1,0 +1,116 @@
+Atleta 000c6417-e1e4-497e-89e6-bb21e17ec355: 247 candidatas de 394 actividades de ciclismo
+  CSV encontrados: 399 | emparejadas: 394 | sin pareja: 0 | ambiguas: 0
+  Desfases: {60: 175, 120: 219}
+  Cobertura de señales:
+    candidatas: 247 | emparejadas: 247 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 246 | >= 80 %: 246 | >= 90 %: 246
+    cobertura global: 99.63% | mediana por actividad: 99.84%
+    duración >= 20 min: 243 | >= 30 min: 237 | >= 60 min: 217
+    tiempo no creciente: 55 | con saltos > 5 s: 215 | con saltos > 60 s: 186 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 244 | >= 20 min: 236 | >= 30 min: 228
+Atleta 0030231e-2aac-4d34-bee0-98dd429d9a9d: 167 candidatas de 305 actividades de ciclismo
+  CSV encontrados: 338 | emparejadas: 304 | sin pareja: 0 | ambiguas: 1
+  Desfases: {570: 136, 630: 164, 660: 4}
+  Cobertura de señales:
+    candidatas: 167 | emparejadas: 167 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 167 | >= 80 %: 167 | >= 90 %: 167
+    cobertura global: 100.00% | mediana por actividad: 100.00%
+    duración >= 20 min: 167 | >= 30 min: 161 | >= 60 min: 145
+    tiempo no creciente: 114 | con saltos > 5 s: 46 | con saltos > 60 s: 44 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 92 | >= 20 min: 56 | >= 30 min: 48
+Atleta 0031326c-e796-4f35-8f25-d3937edca90f: 286 candidatas de 670 actividades de ciclismo
+  CSV encontrados: 746 | emparejadas: 669 | sin pareja: 0 | ambiguas: 1
+  Desfases: {60: 244, 120: 425}
+  Cobertura de señales:
+    candidatas: 286 | emparejadas: 286 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 286 | >= 80 %: 286 | >= 90 %: 284
+    cobertura global: 99.54% | mediana por actividad: 99.92%
+    duración >= 20 min: 263 | >= 30 min: 224 | >= 60 min: 112
+    tiempo no creciente: 0 | con saltos > 5 s: 0 | con saltos > 60 s: 0 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 281 | >= 20 min: 260 | >= 30 min: 219
+Atleta 0066cbd9-2072-472f-8018-2e320f0b2e99: 775 candidatas de 1054 actividades de ciclismo
+  CSV encontrados: 2020 | emparejadas: 1048 | sin pareja: 4 | ambiguas: 2
+  Desfases: {60: 420, 120: 628}
+  Ejemplos sin coincidencia exacta:
+    JSON: 2013/01/30 10:42:22 UTC | CSV cercano: 2013_01_31_07_25_59.csv | diferencia: 1243.62 minutos
+    JSON: 2014/05/24 08:36:03 UTC | CSV cercano: 2014_05_23_18_32_39.csv | diferencia: -843.40 minutos
+    JSON: 2014/05/27 09:56:32 UTC | CSV cercano: 2014_05_27_00_07_55.csv | diferencia: -588.62 minutos
+    JSON: 2014/06/03 09:11:00 UTC | CSV cercano: 2014_06_02_18_33_15.csv | diferencia: -877.75 minutos
+  Cobertura de señales:
+    candidatas: 775 | emparejadas: 775 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 775 | >= 80 %: 775 | >= 90 %: 775
+    cobertura global: 100.00% | mediana por actividad: 100.00%
+    duración >= 20 min: 775 | >= 30 min: 775 | >= 60 min: 601
+    tiempo no creciente: 0 | con saltos > 5 s: 296 | con saltos > 60 s: 194 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 775 | >= 20 min: 775 | >= 30 min: 775
+Atleta 0144ab2a-934d-4be1-9f36-de61aef62a63: 640 candidatas de 1161 actividades de ciclismo
+  CSV encontrados: 1180 | emparejadas: 1161 | sin pareja: 0 | ambiguas: 0
+  Desfases: {540: 1161}
+  Cobertura de señales:
+    candidatas: 640 | emparejadas: 640 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 634 | >= 80 %: 631 | >= 90 %: 622
+    cobertura global: 98.99% | mediana por actividad: 100.00%
+    duración >= 20 min: 601 | >= 30 min: 580 | >= 60 min: 454
+    tiempo no creciente: 0 | con saltos > 5 s: 385 | con saltos > 60 s: 337 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 616 | >= 20 min: 565 | >= 30 min: 514
+Atleta 025bad5c-1cfc-4c22-a2e3-2be1ccb70008: 754 candidatas de 1083 actividades de ciclismo
+  CSV encontrados: 1632 | emparejadas: 1083 | sin pareja: 0 | ambiguas: 0
+  Desfases: {480: 1083}
+  Cobertura de señales:
+    candidatas: 754 | emparejadas: 754 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 754 | >= 80 %: 754 | >= 90 %: 754
+    cobertura global: 99.98% | mediana por actividad: 100.00%
+    duración >= 20 min: 743 | >= 30 min: 738 | >= 60 min: 701
+    tiempo no creciente: 0 | con saltos > 5 s: 476 | con saltos > 60 s: 316 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 745 | >= 20 min: 714 | >= 30 min: 666
+Atleta 0291283c-c8f2-4c81-b9b1-294bf19378db: 833 candidatas de 1143 actividades de ciclismo
+  CSV encontrados: 1387 | emparejadas: 1143 | sin pareja: 0 | ambiguas: 0
+  Desfases: {60: 330, 120: 813}
+  Cobertura de señales:
+    candidatas: 833 | emparejadas: 833 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 819 | >= 80 %: 793 | >= 90 %: 770
+    cobertura global: 95.84% | mediana por actividad: 99.90%
+    duración >= 20 min: 803 | >= 30 min: 791 | >= 60 min: 692
+    tiempo no creciente: 4 | con saltos > 5 s: 205 | con saltos > 60 s: 152 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 807 | >= 20 min: 791 | >= 30 min: 774
+Atleta 029abbce-69c2-42fc-ad44-a85541cd98b4: 4826 candidatas de 5156 actividades de ciclismo
+  CSV encontrados: 5218 | emparejadas: 5138 | sin pareja: 0 | ambiguas: 18
+  Desfases: {540: 5138}
+  Cobertura de señales:
+    candidatas: 4826 | emparejadas: 4809 | sin pareja: 0 | ambiguas: 17 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 4772 | >= 80 %: 4710 | >= 90 %: 4621
+    cobertura global: 98.75% | mediana por actividad: 100.00%
+    duración >= 20 min: 4240 | >= 30 min: 4112 | >= 60 min: 2741
+    tiempo no creciente: 23 | con saltos > 5 s: 2481 | con saltos > 60 s: 2056 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 4201 | >= 20 min: 3715 | >= 30 min: 3213
+Atleta 02a72bf5-d3cf-4502-ac7f-1828abb367ae: 482 candidatas de 1977 actividades de ciclismo
+  CSV encontrados: 2200 | emparejadas: 1940 | sin pareja: 30 | ambiguas: 7
+  Desfases: {180: 1940}
+  Ejemplos sin coincidencia exacta:
+    JSON: 2017/03/29 19:16:18 UTC | CSV cercano: 2017_03_29_22_55_08.csv | diferencia: 218.83 minutos
+    JSON: 2017/05/31 05:20:00 UTC | CSV cercano: 2017_05_31_19_19_49.csv | diferencia: 839.82 minutos
+    JSON: 2017/05/31 05:30:00 UTC | CSV cercano: 2017_05_31_19_19_49.csv | diferencia: 829.82 minutos
+    JSON: 2017/06/02 04:10:00 UTC | CSV cercano: 2017_06_02_08_14_58.csv | diferencia: 244.97 minutos
+    JSON: 2017/07/14 04:07:00 UTC | CSV cercano: 2017_07_13_23_54_53.csv | diferencia: -252.12 minutos
+  Cobertura de señales:
+    candidatas: 482 | emparejadas: 482 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 482 | >= 80 %: 475 | >= 90 %: 471
+    cobertura global: 99.07% | mediana por actividad: 100.00%
+    duración >= 20 min: 428 | >= 30 min: 367 | >= 60 min: 191
+    tiempo no creciente: 1 | con saltos > 5 s: 14 | con saltos > 60 s: 8 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 466 | >= 20 min: 425 | >= 30 min: 360
+Atleta 031c70de-6ccd-48f8-ac62-d50eb3d75387: 1223 candidatas de 1936 actividades de ciclismo
+  CSV encontrados: 2153 | emparejadas: 1930 | sin pareja: 4 | ambiguas: 2
+  Desfases: {-600: 21, -480: 411, -420: 1498}
+  Ejemplos sin coincidencia exacta:
+    JSON: 2016/11/19 17:00:00 UTC | CSV cercano: 2016_11_18_12_55_34.csv | diferencia: -1684.43 minutos
+    JSON: 2017/08/26 18:30:00 UTC | CSV cercano: 2017_08_27_09_50_32.csv | diferencia: 920.53 minutos
+    JSON: 2018/09/06 21:10:00 UTC | CSV cercano: 2018_09_07_08_27_34.csv | diferencia: 677.57 minutos
+    JSON: 2019/11/02 23:10:00 UTC | CSV cercano: 2019_11_02_13_49_00.csv | diferencia: -561.00 minutos
+  Cobertura de señales:
+    candidatas: 1223 | emparejadas: 1223 | sin pareja: 0 | ambiguas: 0 | CSV inválidos: 0 | CSV vacíos: 0
+    cobertura >= 50 %: 1222 | >= 80 %: 1222 | >= 90 %: 1222
+    cobertura global: 99.91% | mediana por actividad: 100.00%
+    duración >= 20 min: 1183 | >= 30 min: 1135 | >= 60 min: 1004
+    tiempo no creciente: 1 | con saltos > 5 s: 780 | con saltos > 60 s: 561 | sin tiempo válido: 0
+    tramo continuo >= 10 min: 1207 | >= 20 min: 1153 | >= 30 min: 1089
