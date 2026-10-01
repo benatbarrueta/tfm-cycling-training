@@ -1,4 +1,5 @@
 import pytest
+import csv
 import json
 import zipfile
 
@@ -26,6 +27,13 @@ from app.data.response_audit import (
     summarize_time_axis,
     summarize_activity_signal_quality,
     longest_continuous_paired_segment_seconds,
+    extract_longest_continuous_paired_segment,
+    split_segment_by_time,
+    calculate_aerobic_decoupling,
+    build_activity_response,
+    build_decoupling_comparison,
+    collect_athlete_decoupling_comparisons,
+    save_decoupling_comparisons,
 )
 
 
@@ -516,6 +524,62 @@ def test_audit_athlete_signal_coverage_requires_zip(tmp_path):
     with pytest.raises(ValueError):
         audit_athlete_signal_coverage(path)
 
+def test_collect_athlete_decoupling_comparisons(tmp_path):
+    zip_path = tmp_path / "athlete.zip"
+
+    summary = {
+        "ATHLETE": {
+            "id": "{athlete-a}",
+        },
+        "RIDES": [
+            {
+                "date": "2026/01/01 10:00:00 UTC",
+                "sport": "Bike",
+                "METRICS": {
+                    "average_power": 190,
+                    "average_hr": 100,
+                    "aerobic_decoupling": 8,
+                },
+            },
+        ],
+    }
+
+    csv_content = "secs,power,hr\n" + "".join(
+        (
+            f"{second},"
+            f"{200 if second <= 600 else 180},"
+            "100\n"
+        )
+        for second in range(0, 1201)
+    )
+
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr(
+            "athlete.json",
+            json.dumps(summary),
+        )
+        archive.writestr(
+            "2026_01_01_10_00_00.csv",
+            csv_content,
+        )
+
+    result = collect_athlete_decoupling_comparisons(
+        zip_path
+    )
+
+    assert len(result) == 1
+
+    assert result[0] == {
+        "athlete_id": "athlete-a",
+        "csv_name": "2026_01_01_10_00_00.csv",
+        "ride_date": "2026/01/01 10:00:00 UTC",
+        "reported_decoupling": 8.0,
+        "calculated_decoupling": pytest.approx(10.0),
+        "difference": pytest.approx(2.0),
+        "continuous_duration_seconds": 1200,
+        "paired_sample_count": 1201,
+    }
+
 def test_summarize_time_axis():
     samples = [
         {"secs": "0"},
@@ -590,4 +654,248 @@ def test_longest_continuous_segment_rejects_invalid_gap():
         longest_continuous_paired_segment_seconds(
             [],
             max_gap_seconds=0,
+        )
+
+def test_extract_longest_continuous_paired_segment():
+    samples = [
+        {"secs": "0", "power": "200", "hr": "140"},
+        {"secs": "1", "power": "210", "hr": "141"},
+        {"secs": "2", "power": "", "hr": "142"},
+        {"secs": "4", "power": "220", "hr": "143"},
+        {"secs": "10", "power": "230", "hr": "144"},
+        {"secs": "11", "power": "240", "hr": "145"},
+    ]
+
+    result = extract_longest_continuous_paired_segment(
+        samples,
+        max_gap_seconds=5,
+    )
+
+    assert result == [
+        {"secs": "0", "power": "200", "hr": "140"},
+        {"secs": "1", "power": "210", "hr": "141"},
+        {"secs": "4", "power": "220", "hr": "143"},
+    ]
+
+def test_extract_longest_continuous_paired_segment_empty():
+    assert extract_longest_continuous_paired_segment([]) == []
+
+def test_extract_longest_continuous_paired_segment_rejects_invalid_gap():
+    with pytest.raises(ValueError):
+        extract_longest_continuous_paired_segment(
+            [],
+            max_gap_seconds=0,
+        )
+
+def test_split_segment_by_time():
+    segment = [
+        {"secs": "0", "power": "200", "hr": "140"},
+        {"secs": "1", "power": "210", "hr": "141"},
+        {"secs": "4", "power": "220", "hr": "143"},
+        {"secs": "5", "power": "225", "hr": "144"},
+        {"secs": "8", "power": "230", "hr": "145"},
+    ]
+
+    first_half, second_half = split_segment_by_time(segment)
+
+    assert first_half == segment[:3]
+    assert second_half == segment[3:]
+
+def test_split_segment_by_time_requires_two_samples():
+    with pytest.raises(ValueError):
+        split_segment_by_time([
+            {"secs": "0", "power": "200", "hr": "140"},
+        ])
+
+def test_split_segment_by_time_requires_increasing_time():
+    segment = [
+        {"secs": "10", "power": "200", "hr": "140"},
+        {"secs": "10", "power": "210", "hr": "141"},
+    ]
+
+    with pytest.raises(ValueError):
+        split_segment_by_time(segment)
+
+def test_calculate_aerobic_decoupling():
+    segment = [
+        {"secs": "0", "power": "200", "hr": "100"},
+        {"secs": "1", "power": "200", "hr": "100"},
+        {"secs": "2", "power": "180", "hr": "100"},
+        {"secs": "3", "power": "180", "hr": "100"},
+    ]
+
+    result = calculate_aerobic_decoupling(segment)
+
+    assert result == pytest.approx(10.0)
+
+def test_calculate_aerobic_decoupling_without_change():
+    segment = [
+        {"secs": "0", "power": "200", "hr": "100"},
+        {"secs": "1", "power": "200", "hr": "100"},
+        {"secs": "2", "power": "220", "hr": "110"},
+        {"secs": "3", "power": "220", "hr": "110"},
+    ]
+
+    result = calculate_aerobic_decoupling(segment)
+
+    assert result == pytest.approx(0.0)
+
+def test_calculate_aerobic_decoupling_with_zero_power():
+    segment = [
+        {"secs": "0", "power": "0", "hr": "100"},
+        {"secs": "1", "power": "0", "hr": "100"},
+        {"secs": "2", "power": "180", "hr": "100"},
+        {"secs": "3", "power": "180", "hr": "100"},
+    ]
+
+    assert calculate_aerobic_decoupling(segment) is None
+
+def test_build_activity_response():
+    samples = [
+        {"secs": "0", "power": "200", "hr": "100"},
+        {"secs": "1", "power": "200", "hr": "100"},
+        {"secs": "2", "power": "180", "hr": "100"},
+        {"secs": "3", "power": "180", "hr": "100"},
+    ]
+
+    result = build_activity_response(
+        samples,
+        min_duration_seconds=3,
+    )
+
+    assert result == {
+        "continuous_duration_seconds": 3,
+        "paired_sample_count": 4,
+        "aerobic_decoupling": pytest.approx(10.0),
+    }
+
+def test_build_activity_response_rejects_short_segment():
+    samples = [
+        {"secs": "0", "power": "200", "hr": "100"},
+        {"secs": "1", "power": "200", "hr": "100"},
+    ]
+
+    result = build_activity_response(
+        samples,
+        min_duration_seconds=20 * 60,
+    )
+
+    assert result is None
+
+def test_build_activity_response_rejects_invalid_duration():
+    with pytest.raises(ValueError):
+        build_activity_response(
+            [],
+            min_duration_seconds=0,
+        )
+
+def test_build_decoupling_comparison():
+    ride = {
+        "date": "2026/01/01 10:00:00 UTC",
+        "METRICS": {
+            "aerobic_decoupling": ["8", "1"],
+        },
+    }
+
+    samples = [
+        {"secs": "0", "power": "200", "hr": "100"},
+        {"secs": "1", "power": "200", "hr": "100"},
+        {"secs": "2", "power": "180", "hr": "100"},
+        {"secs": "3", "power": "180", "hr": "100"},
+    ]
+
+    result = build_decoupling_comparison(
+        ride,
+        samples,
+        min_duration_seconds=3,
+    )
+
+    assert result == {
+        "ride_date": "2026/01/01 10:00:00 UTC",
+        "reported_decoupling": 8.0,
+        "calculated_decoupling": pytest.approx(10.0),
+        "difference": pytest.approx(2.0),
+        "continuous_duration_seconds": 3,
+        "paired_sample_count": 4,
+    }
+
+def test_build_decoupling_comparison_without_reported_value():
+    ride = {
+        "date": "2026/01/01 10:00:00 UTC",
+        "METRICS": {},
+    }
+
+    assert build_decoupling_comparison(
+        ride,
+        [],
+    ) is None
+
+def test_build_decoupling_comparison_rejects_short_activity():
+    ride = {
+        "date": "2026/01/01 10:00:00 UTC",
+        "METRICS": {
+            "aerobic_decoupling": 8,
+        },
+    }
+
+    samples = [
+        {"secs": "0", "power": "200", "hr": "100"},
+        {"secs": "1", "power": "180", "hr": "100"},
+    ]
+
+    assert build_decoupling_comparison(
+        ride,
+        samples,
+        min_duration_seconds=20 * 60,
+    ) is None
+
+def test_save_decoupling_comparisons(tmp_path):
+    output = tmp_path / "results" / "decoupling.csv"
+
+    comparisons = [
+        {
+            "athlete_id": "athlete-a",
+            "csv_name": "activity.csv",
+            "ride_date": "2026/01/01 10:00:00 UTC",
+            "reported_decoupling": 8.0,
+            "calculated_decoupling": 10.0,
+            "difference": 2.0,
+            "continuous_duration_seconds": 1200,
+            "paired_sample_count": 1201,
+        },
+    ]
+
+    save_decoupling_comparisons(
+        comparisons,
+        output,
+    )
+
+    with output.open(
+        encoding="utf-8",
+        newline="",
+    ) as file:
+        rows = list(csv.DictReader(file))
+
+    assert rows == [
+        {
+            "athlete_id": "athlete-a",
+            "csv_name": "activity.csv",
+            "ride_date": "2026/01/01 10:00:00 UTC",
+            "reported_decoupling": "8.0",
+            "calculated_decoupling": "10.0",
+            "difference": "2.0",
+            "continuous_duration_seconds": "1200",
+            "paired_sample_count": "1201",
+        },
+    ]
+
+def test_save_decoupling_comparisons_rejects_empty_list(
+    tmp_path,
+):
+    output = tmp_path / "decoupling.csv"
+
+    with pytest.raises(ValueError):
+        save_decoupling_comparisons(
+            [],
+            output,
         )

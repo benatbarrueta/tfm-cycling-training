@@ -696,6 +696,65 @@ def audit_athlete_signal_coverage(
         ),
     }
 
+def collect_athlete_decoupling_comparisons(
+    zip_path: str | Path,
+) -> list[dict]:
+    """Compara el desacoplamiento de todas las actividades válidas."""
+    zip_path = Path(zip_path)
+
+    if zip_path.suffix.lower() != ".zip":
+        raise ValueError(
+            "La comparación requiere un archivo ZIP."
+        )
+
+    data = read_athlete_summary(zip_path)
+    athlete_id = str(data["ATHLETE"]["id"]).strip("{}")
+
+    csv_names = list_activity_csvs(zip_path)
+    csv_index = build_csv_datetime_index(csv_names)
+
+    comparisons = []
+
+    with zipfile.ZipFile(zip_path) as archive:
+        for ride in data["RIDES"]:
+            if ride.get("sport") != "Bike":
+                continue
+
+            if not has_power_and_heart_rate(ride):
+                continue
+
+            match = match_activity_csv(
+                ride["date"],
+                csv_index,
+            )
+
+            if match["status"] != "matched":
+                continue
+
+            try:
+                samples = read_activity_samples(
+                    archive,
+                    match["csv_name"],
+                )
+            except ValueError:
+                continue
+
+            comparison = build_decoupling_comparison(
+                ride,
+                samples,
+            )
+
+            if comparison is None:
+                continue
+
+            comparisons.append({
+                "athlete_id": athlete_id,
+                "csv_name": match["csv_name"],
+                **comparison,
+            })
+
+    return comparisons
+
 def summarize_time_axis(samples: list[dict]) -> dict:
     """Analiza continuidad y duración del eje temporal."""
     seconds = []
@@ -758,19 +817,105 @@ def summarize_activity_signal_quality(
         **summarize_time_axis(samples),
     }
 
-def longest_continuous_paired_segment_seconds(
+def _segment_duration(segment: list[dict]) -> float:
+    """Calcula la duración entre la primera y la última muestra."""
+    if len(segment) < 2:
+        return 0.0
+
+    start = metric(segment[0].get("secs"))
+    end = metric(segment[-1].get("secs"))
+
+    return end - start
+
+def split_segment_by_time(
+    segment: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Divide un tramo en dos mitades de igual duración temporal."""
+    if len(segment) < 2:
+        raise ValueError(
+            "Se necesitan al menos dos muestras."
+        )
+
+    start = metric(segment[0].get("secs"))
+    end = metric(segment[-1].get("secs"))
+
+    if start is None or end is None or end <= start:
+        raise ValueError(
+            "El tramo debe tener un eje temporal creciente."
+        )
+
+    midpoint = start + (end - start) / 2
+
+    first_half = [
+        sample
+        for sample in segment
+        if metric(sample.get("secs")) <= midpoint
+    ]
+
+    second_half = [
+        sample
+        for sample in segment
+        if metric(sample.get("secs")) > midpoint
+    ]
+
+    if not first_half or not second_half:
+        raise ValueError(
+            "No se pueden construir las dos mitades."
+        )
+
+    return first_half, second_half
+
+def calculate_aerobic_decoupling(
+    segment: list[dict],
+) -> float | None:
+    """Calcula el desacoplamiento potencia/FC entre ambas mitades."""
+    first_half, second_half = split_segment_by_time(segment)
+
+    first_power = sum(
+        metric(sample.get("power"))
+        for sample in first_half
+    ) / len(first_half)
+
+    second_power = sum(
+        metric(sample.get("power"))
+        for sample in second_half
+    ) / len(second_half)
+
+    first_hr = sum(
+        metric(sample.get("hr"))
+        for sample in first_half
+    ) / len(first_half)
+
+    second_hr = sum(
+        metric(sample.get("hr"))
+        for sample in second_half
+    ) / len(second_half)
+
+    if first_power <= 0 or second_power <= 0:
+        return None
+
+    first_ratio = first_power / first_hr
+    second_ratio = second_power / second_hr
+
+    return (
+        100
+        * (first_ratio - second_ratio)
+        / first_ratio
+    )
+
+def extract_longest_continuous_paired_segment(
     samples: list[dict],
     *,
     max_gap_seconds: float = 5,
-) -> float:
-    """Calcula el tramo continuo más largo con potencia y FC."""
+) -> list[dict]:
+    """Extrae el tramo continuo más largo con potencia y FC válidas."""
     if max_gap_seconds <= 0:
         raise ValueError(
             "El salto máximo debe ser mayor que cero."
         )
 
-    longest_duration = 0.0
-    segment_start = None
+    longest_segment = []
+    current_segment = []
     previous_second = None
 
     for sample in samples:
@@ -788,24 +933,137 @@ def longest_continuous_paired_segment_seconds(
         if not has_paired_signal:
             continue
 
-        if segment_start is None:
-            segment_start = second
-            previous_second = second
-            continue
-
-        gap = second - previous_second
-
-        if 0 < gap <= max_gap_seconds:
-            previous_second = second
-            longest_duration = max(
-                longest_duration,
-                previous_second - segment_start,
-            )
+        if previous_second is None:
+            current_segment = [sample]
         else:
-            segment_start = second
-            previous_second = second
+            gap = second - previous_second
 
-    return longest_duration
+            if 0 < gap <= max_gap_seconds:
+                current_segment.append(sample)
+            else:
+                if _segment_duration(current_segment) > _segment_duration(
+                    longest_segment
+                ):
+                    longest_segment = current_segment
+
+                current_segment = [sample]
+
+        previous_second = second
+
+    if _segment_duration(current_segment) > _segment_duration(
+        longest_segment
+    ):
+        longest_segment = current_segment
+
+    return longest_segment
+
+def longest_continuous_paired_segment_seconds(
+    samples: list[dict],
+    *,
+    max_gap_seconds: float = 5,
+) -> float:
+    """Calcula la duración del tramo continuo más largo con potencia y FC."""
+    segment = extract_longest_continuous_paired_segment(
+        samples,
+        max_gap_seconds=max_gap_seconds,
+    )
+
+    return _segment_duration(segment)
+
+def build_activity_response(
+    samples: list[dict],
+    *,
+    min_duration_seconds: float = 20 * 60,
+    max_gap_seconds: float = 5,
+) -> dict | None:
+    """Construye la respuesta cardiovascular de una actividad válida."""
+    if min_duration_seconds <= 0:
+        raise ValueError(
+            "La duración mínima debe ser mayor que cero."
+        )
+
+    segment = extract_longest_continuous_paired_segment(
+        samples,
+        max_gap_seconds=max_gap_seconds,
+    )
+
+    duration = _segment_duration(segment)
+
+    if duration < min_duration_seconds:
+        return None
+
+    decoupling = calculate_aerobic_decoupling(segment)
+
+    if decoupling is None:
+        return None
+
+    return {
+        "continuous_duration_seconds": duration,
+        "paired_sample_count": len(segment),
+        "aerobic_decoupling": decoupling,
+    }
+
+def build_decoupling_comparison(
+    ride: dict,
+    samples: list[dict],
+    *,
+    min_duration_seconds: float = 20 * 60,
+) -> dict | None:
+    """Compara el desacoplamiento calculado con el de GoldenCheetah."""
+    reported_decoupling = metric(
+        ride.get("METRICS", {}).get("aerobic_decoupling")
+    )
+
+    if reported_decoupling is None:
+        return None
+
+    response = build_activity_response(
+        samples,
+        min_duration_seconds=min_duration_seconds,
+    )
+
+    if response is None:
+        return None
+
+    calculated_decoupling = response["aerobic_decoupling"]
+
+    return {
+        "ride_date": ride["date"],
+        "reported_decoupling": reported_decoupling,
+        "calculated_decoupling": calculated_decoupling,
+        "difference": (
+            calculated_decoupling - reported_decoupling
+        ),
+        "continuous_duration_seconds": (
+            response["continuous_duration_seconds"]
+        ),
+        "paired_sample_count": response["paired_sample_count"],
+    }
+
+def save_decoupling_comparisons(
+    comparisons: list[dict],
+    output: str | Path,
+) -> None:
+    """Guarda las comparaciones de desacoplamiento en un CSV."""
+    if not comparisons:
+        raise ValueError(
+            "No hay comparaciones que guardar."
+        )
+
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    with output.open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=list(comparisons[0]),
+        )
+        writer.writeheader()
+        writer.writerows(comparisons)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -825,7 +1083,18 @@ def main():
         help="Analiza la cobertura de potencia y frecuencia cardiaca.",
     )
 
+    parser.add_argument(
+        "--decoupling-output",
+        type=Path,
+        help=(
+            "Guarda en CSV la comparación del desacoplamiento "
+            "calculado y el informado por GoldenCheetah."
+        ),
+    )
+
     args = parser.parse_args()
+
+    all_comparisons = []
 
     for path in args.sources:
         summary = audit_athlete_summary(path)
@@ -885,6 +1154,19 @@ def main():
                         f"{example['nearest_csv']} | "
                         f"diferencia: {difference_text}"
                     )
+
+            if args.decoupling_output is not None:
+                comparisons = (
+                    collect_athlete_decoupling_comparisons(
+                        path
+                    )
+                )
+                all_comparisons.extend(comparisons)
+
+                print(
+                    "  Comparaciones de desacoplamiento válidas: "
+                    f"{len(comparisons)}"
+                )
 
             if args.signal_coverage:
                 coverage = audit_athlete_signal_coverage(path)
@@ -966,6 +1248,20 @@ def main():
                     f"{coverage['continuous_segment_at_least_30_minutes']}"
                 )
 
+    if args.decoupling_output is not None:
+        save_decoupling_comparisons(
+            all_comparisons,
+            args.decoupling_output,
+        )
+
+        print(
+            "\nComparaciones guardadas en: "
+            f"{args.decoupling_output}"
+        )
+        print(
+            "Filas exportadas: "
+            f"{len(all_comparisons)}"
+        )
 
 if __name__ == "__main__":
     main()
