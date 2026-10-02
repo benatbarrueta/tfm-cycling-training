@@ -1,0 +1,25 @@
+.placeholder-page {
+  width: min(100% - 2rem, 76rem);
+  margin: 0 auto;
+  padding: 4rem 0;
+}
+
+.placeholder-page__eyebrow {
+  margin: 0 0 0.5rem;
+  color: #27734b;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.placeholder-page h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+}
+
+.placeholder-page > p:last-child {
+  max-width: 40rem;
+  color: #637068;
+  line-height: 1.6;
+}

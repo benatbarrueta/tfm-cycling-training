@@ -1,0 +1,64 @@
+.calendar-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.calendar-toolbar h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  text-align: center;
+}
+
+.calendar-toolbar__navigation,
+.calendar-toolbar__views {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.calendar-toolbar__views {
+  justify-content: flex-end;
+}
+
+.calendar-toolbar button {
+  min-height: 2.5rem;
+  padding: 0 0.8rem;
+  color: #35483d;
+  background: #ffffff;
+  border: 1px solid #cad6ce;
+  border-radius: 0.55rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.calendar-toolbar button:hover {
+  background: #edf6f0;
+  border-color: #8db89c;
+}
+
+.calendar-toolbar__view--active {
+  color: #ffffff !important;
+  background: #27734b !important;
+  border-color: #27734b !important;
+}
+
+@media (max-width: 720px) {
+  .calendar-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-toolbar h1 {
+    grid-row: 1;
+    text-align: left;
+  }
+
+  .calendar-toolbar__navigation,
+  .calendar-toolbar__views {
+    justify-content: flex-start;
+  }
+
+  .calendar-toolbar__views {
+    overflow-x: auto;
+  }
+}

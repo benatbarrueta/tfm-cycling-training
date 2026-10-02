@@ -1,0 +1,117 @@
+.weekly-plan {
+  width: min(100% - 2rem, 76rem);
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+.weekly-plan__header {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.weekly-plan__eyebrow {
+  margin: 0 0 0.5rem;
+  color: #27734b;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.weekly-plan__header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1;
+}
+
+.weekly-plan__description {
+  max-width: 38rem;
+  margin: 1rem 0 0;
+  color: #637068;
+}
+
+.weekly-plan__decision {
+  min-width: 12rem;
+  padding: 1rem;
+  background: #193d2a;
+  color: #ffffff;
+  border-radius: 1rem;
+}
+
+.weekly-plan__decision span,
+.weekly-plan__decision strong {
+  display: block;
+}
+
+.weekly-plan__decision span {
+  margin-bottom: 0.25rem;
+  color: #b8d8c5;
+  font-size: 0.75rem;
+}
+
+.weekly-plan__summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.weekly-plan__summary article {
+  padding: 1rem;
+  background: #eaf1ec;
+  border-radius: 0.85rem;
+}
+
+.weekly-plan__summary span,
+.weekly-plan__summary strong {
+  display: block;
+}
+
+.weekly-plan__summary span {
+  color: #637068;
+  font-size: 0.8rem;
+}
+
+.weekly-plan__summary strong {
+  margin-top: 0.3rem;
+  font-size: 1.35rem;
+}
+
+.weekly-plan__notice {
+  padding: 0.9rem 1rem;
+  color: #6b4c12;
+  background: #fff3cf;
+  border: 1px solid #f1d98c;
+  border-radius: 0.75rem;
+}
+
+.weekly-plan__workouts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 800px) {
+  .weekly-plan__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .weekly-plan__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .weekly-plan__workouts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .weekly-plan__summary {
+    grid-template-columns: 1fr;
+  }
+}

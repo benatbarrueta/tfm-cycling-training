@@ -1,0 +1,164 @@
+.activities-page {
+  display: grid;
+  width: min(100% - 2rem, 76rem);
+  margin: 0 auto;
+  padding: 3rem 0;
+  gap: 1.5rem;
+}
+
+.activities-page__header {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.activities-page__header h1,
+.activities-page__header p {
+  margin: 0;
+}
+
+.activities-page__header h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+}
+
+.activities-page__header > div:first-child > p:last-child {
+  max-width: 42rem;
+  margin-top: 0.8rem;
+  color: #637068;
+  line-height: 1.5;
+}
+
+.activities-page__eyebrow {
+  margin-bottom: 0.4rem !important;
+  color: #27734b;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.activities-page__counter {
+  min-width: 10rem;
+  padding: 1rem;
+  background: #193d2a;
+  color: #ffffff;
+  border-radius: 1rem;
+}
+
+.activities-page__counter strong,
+.activities-page__counter span {
+  display: block;
+}
+
+.activities-page__counter strong {
+  font-size: 1.8rem;
+}
+
+.activities-page__counter span {
+  color: #b8d8c5;
+  font-size: 0.75rem;
+}
+
+.activities-page__history {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dce5df;
+  border-radius: 1rem;
+}
+
+.activities-page__history > header {
+  display: flex;
+  padding: 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e3e9e5;
+}
+
+.activities-page__history h2,
+.activities-page__history p {
+  margin: 0;
+}
+
+.activities-page__history p {
+  margin-top: 0.25rem;
+  color: #637068;
+  font-size: 0.85rem;
+}
+
+.activities-page__history > header button {
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  color: #245c3d;
+  background: #edf6f0;
+  border: 1px solid #bcd8c6;
+  border-radius: 0.6rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.activities-page__empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.activities-page__empty p {
+  margin-top: 0.5rem;
+}
+
+.activities-page__table-wrapper {
+  overflow-x: auto;
+}
+
+.activities-page__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.activities-page__table th,
+.activities-page__table td {
+  padding: 0.9rem 1rem;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #edf1ee;
+}
+
+.activities-page__table th {
+  color: #637068;
+  background: #f7f9f7;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.activities-page__delete {
+  color: #9a382b;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 680px) {
+  .activities-page__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activities-page__history > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

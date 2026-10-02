@@ -1,0 +1,123 @@
+.activity-form {
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid #dce5df;
+  border-radius: 1rem;
+  box-shadow: 0 0.5rem 1.5rem rgb(25 55 38 / 8%);
+}
+
+.activity-form__header {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.activity-form__header h2,
+.activity-form__header p {
+  margin: 0;
+}
+
+.activity-form__header > p {
+  max-width: 24rem;
+  color: #637068;
+  line-height: 1.5;
+}
+
+.activity-form__eyebrow {
+  margin-bottom: 0.25rem !important;
+  color: #27734b;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.activity-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.activity-form__field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.activity-form__field span {
+  color: #35483d;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.activity-form__field input {
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.65rem 0.75rem;
+  color: #17211b;
+  background: #f8faf8;
+  border: 1px solid #cad6ce;
+  border-radius: 0.65rem;
+  outline: none;
+}
+
+.activity-form__field input:focus {
+  background: #ffffff;
+  border-color: #2e8b57;
+  box-shadow: 0 0 0 3px rgb(46 139 87 / 15%);
+}
+
+.activity-form__field small {
+  color: #a13727;
+  line-height: 1.3;
+}
+
+.activity-form__actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e3e9e5;
+}
+
+.activity-form__actions p {
+  max-width: 32rem;
+  margin: 0;
+  color: #637068;
+  font-size: 0.8rem;
+}
+
+.activity-form__actions button {
+  min-height: 2.8rem;
+  padding: 0 1.1rem;
+  color: #ffffff;
+  background: #27734b;
+  border: 0;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.activity-form__actions button:hover {
+  background: #1d5d3b;
+}
+
+.activity-form__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (max-width: 680px) {
+  .activity-form__header,
+  .activity-form__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-form__grid {
+    grid-template-columns: 1fr;
+  }
+}

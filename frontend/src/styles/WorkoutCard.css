@@ -1,0 +1,104 @@
+.workout-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  color: #17211b;
+  background: #ffffff;
+  border: 1px solid #dce5df;
+  border-radius: 1rem;
+  box-shadow: 0 0.5rem 1.5rem rgb(25 55 38 / 8%);
+}
+
+.workout-card__header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.workout-card__day {
+  margin: 0 0 0.25rem;
+  color: #607067;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workout-card__title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.workout-card__response {
+  padding: 0.4rem 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.workout-card__response--stable {
+  color: #17663a;
+  background: #dff5e8;
+}
+
+.workout-card__response--elevated {
+  color: #8a351b;
+  background: #ffe6dc;
+}
+
+.workout-card__response--unknown {
+  color: #59615d;
+  background: #edf0ee;
+}
+
+.workout-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.workout-card__metrics div {
+  padding: 0.75rem;
+  background: #f4f7f5;
+  border-radius: 0.75rem;
+}
+
+.workout-card__metrics dt {
+  color: #68756d;
+  font-size: 0.75rem;
+}
+
+.workout-card__metrics dd {
+  margin: 0.25rem 0 0;
+  font-weight: 700;
+}
+
+.workout-card__intervals {
+  padding: 0.9rem;
+  background: #edf4ff;
+  border-radius: 0.75rem;
+}
+
+.workout-card__intervals h3,
+.workout-card__intervals p {
+  margin: 0;
+}
+
+.workout-card__intervals p {
+  margin-top: 0.35rem;
+}
+
+.workout-card__footer {
+  padding-top: 0.8rem;
+  color: #526159;
+  font-size: 0.9rem;
+  border-top: 1px solid #e3e9e5;
+}
+
+@media (max-width: 600px) {
+  .workout-card__metrics {
+    grid-template-columns: 1fr;
+  }
+}
