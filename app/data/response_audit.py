@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from statistics import median
 
-from app.data.goldencheetah import metric
+from app.data.goldencheetah import metric, signed_metric
 
 SUPPORTED_OFFSET_MINUTES = tuple(
     range(-14 * 60, 14 * 60 + 1, 15)
@@ -997,7 +997,7 @@ def build_decoupling_comparison(
     min_duration_seconds: float = 20 * 60,
 ) -> dict | None:
     """Compara el desacoplamiento calculado con el de GoldenCheetah."""
-    reported_decoupling = metric(
+    reported_decoupling = signed_metric(
         ride.get("METRICS", {}).get("aerobic_decoupling")
     )
 
@@ -1445,7 +1445,7 @@ def build_response_dataset_row(
         **history_features,
         **relative_load_features,
         "target_aerobic_decoupling": (
-            comparison["reported_decoupling"]
+            comparison["calculated_decoupling"]
         ),
     }
 
@@ -1460,7 +1460,7 @@ def summarize_prior_responses(
     )
 
     previous_values = [
-        float(comparison["reported_decoupling"])
+        float(comparison["calculated_decoupling"])
         for comparison in comparisons
         if (
             is_eligible_decoupling_response(comparison)

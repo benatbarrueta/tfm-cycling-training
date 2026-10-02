@@ -70,12 +70,16 @@ def generate_personalized_training_plan(
             cyclist=cyclist,
         )
 
+    requested_target_tss = target_tss
+
     plan = generate_feasible_training_plan(
         cyclist=cyclist,
         modality=modality,
         target_tss=target_tss,
         reference_date=reference_date,
     )
+
+    plan.requested_target_tss = requested_target_tss
 
     plan.expected_aerobic_decoupling = expected_decoupling
     plan.aerobic_response = aerobic_response

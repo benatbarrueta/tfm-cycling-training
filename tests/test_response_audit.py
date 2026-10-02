@@ -1358,6 +1358,7 @@ def test_build_response_dataset_row():
 
     comparison = {
         "reported_decoupling": 8.0,
+        "calculated_decoupling": 8.0,
         "power_cv": 0.50,
         "zero_power_fraction": 0.10,
         "power_balance_ratio": 0.90,
@@ -1517,6 +1518,7 @@ def test_summarize_prior_responses():
         {
             "ride_date": "2026/01/01 10:00:00 UTC",
             "reported_decoupling": 4.0,
+            "calculated_decoupling": 4.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1524,6 +1526,7 @@ def test_summarize_prior_responses():
         {
             "ride_date": "2026/01/03 10:00:00 UTC",
             "reported_decoupling": 8.0,
+            "calculated_decoupling": 8.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1531,6 +1534,7 @@ def test_summarize_prior_responses():
         {
             "ride_date": "2026/01/05 10:00:00 UTC",
             "reported_decoupling": 12.0,
+            "calculated_decoupling": 12.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1538,6 +1542,7 @@ def test_summarize_prior_responses():
         {
             "ride_date": "2026/01/06 10:00:00 UTC",
             "reported_decoupling": 50.0,
+            "calculated_decoupling": 50.0,
             "power_cv": 0.90,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1545,6 +1550,7 @@ def test_summarize_prior_responses():
         {
             "ride_date": "2026/01/20 10:00:00 UTC",
             "reported_decoupling": 100.0,
+            "calculated_decoupling": 100.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1566,6 +1572,7 @@ def test_summarize_prior_responses_requires_three_values():
         {
             "ride_date": "2026/01/01 10:00:00 UTC",
             "reported_decoupling": 4.0,
+            "calculated_decoupling": 4.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1573,6 +1580,7 @@ def test_summarize_prior_responses_requires_three_values():
         {
             "ride_date": "2026/01/03 10:00:00 UTC",
             "reported_decoupling": 8.0,
+            "calculated_decoupling": 8.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1626,6 +1634,7 @@ def test_build_athlete_response_rows():
         {
             "ride_date": "2026/01/01 10:00:00 UTC",
             "reported_decoupling": 4.0,
+            "calculated_decoupling": 4.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1633,6 +1642,7 @@ def test_build_athlete_response_rows():
         {
             "ride_date": "2026/01/03 10:00:00 UTC",
             "reported_decoupling": 8.0,
+            "calculated_decoupling": 8.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1640,6 +1650,7 @@ def test_build_athlete_response_rows():
         {
             "ride_date": "2026/01/05 09:00:00 UTC",
             "reported_decoupling": 12.0,
+            "calculated_decoupling": 12.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1647,6 +1658,7 @@ def test_build_athlete_response_rows():
         {
             "ride_date": "2026/01/10 10:00:00 UTC",
             "reported_decoupling": 8.0,
+            "calculated_decoupling": 8.0,
             "power_cv": 0.50,
             "zero_power_fraction": 0.10,
             "power_balance_ratio": 0.90,
@@ -1793,3 +1805,78 @@ def test_build_relative_load_features_requires_chronic_load():
         50,
         history_features,
     ) is None
+
+def test_build_decoupling_comparison_accepts_negative_reported_value():
+    ride = {
+        "date": "2026/01/01 10:00:00 UTC",
+        "METRICS": {
+            "aerobic_decoupling": "-2.0",
+        },
+    }
+
+    samples = [
+        {
+            "secs": str(second),
+            "power": str(
+                200 if second <= 600 else 180
+            ),
+            "hr": "100",
+        }
+        for second in range(1201)
+    ]
+
+    result = build_decoupling_comparison(
+        ride,
+        samples,
+    )
+
+    assert result is not None
+    assert result["reported_decoupling"] == -2.0
+
+def test_response_dataset_uses_calculated_decoupling():
+    ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "workout_time": "3600",
+            "coggan_if": "0.75",
+            "coggan_tss": "56.25",
+        },
+    }
+
+    rides = [
+        {
+            "date": "2025/12/10 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {
+                "coggan_tss": "40",
+            },
+        },
+        {
+            "date": "2026/01/05 10:00:00 UTC",
+            "sport": "Bike",
+            "METRICS": {
+                "coggan_tss": "50",
+            },
+        },
+        ride,
+    ]
+
+    comparison = {
+        "ride_date": "2026/01/10 10:00:00 UTC",
+        "reported_decoupling": -120.0,
+        "calculated_decoupling": -8.0,
+        "power_cv": 0.30,
+        "zero_power_fraction": 0.01,
+        "power_balance_ratio": 0.90,
+    }
+
+    result = build_response_dataset_row(
+        "athlete-a",
+        rides,
+        ride,
+        comparison,
+    )
+
+    assert result is not None
+    assert result["target_aerobic_decoupling"] == -8.0

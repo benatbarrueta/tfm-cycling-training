@@ -20,19 +20,32 @@ METRICS = {
     "tss": "coggan_tss",
 }
 
-
-def metric(value):
-    """Read a scalar or the value component of a GoldenCheetah metric pair."""
+def signed_metric(value):
+    """Lee una métrica finita que puede ser positiva o negativa."""
     if isinstance(value, list):
         value = value[0] if len(value) == 2 else None
+
     if isinstance(value, bool):
         return None
+
     try:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return number if math.isfinite(number) and number >= 0 else None
 
+    if not math.isfinite(number):
+        return None
+
+    return number
+
+def metric(value):
+    """Lee una métrica de GoldenCheetah que no puede ser negativa."""
+    number = signed_metric(value)
+
+    if number is None or number < 0:
+        return None
+
+    return number
 
 def import_athlete(path, max_duration_hours=12):
     """Return normalized Bike records and an audit; fail on ambiguous identity."""
@@ -88,7 +101,6 @@ def import_athlete(path, max_duration_hours=12):
                                         for flag in row["quality_flags"].split("|") if flag))
     return sorted(records, key=lambda row: row["date_utc"]), audit
 
-
 def weekly_table(records):
     """Include gap weeks and expose partial sums separately from usable totals.
 
@@ -127,7 +139,6 @@ def weekly_table(records):
             week += timedelta(days=7)
     return output
 
-
 def write_csv(path, rows):
     if not rows:
         raise ValueError(f"No rows to export to {path}")
@@ -135,7 +146,6 @@ def write_csv(path, rows):
         writer = csv.DictWriter(file, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

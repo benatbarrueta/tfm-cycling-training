@@ -9,6 +9,7 @@ from app.models.workout import Workout
 class TrainingPlan:
     target_tss: float
     workouts: list[Workout]
+    requested_target_tss: float | None = None
     expected_aerobic_decoupling: float | None = None
     aerobic_response: AerobicResponse = AerobicResponse.UNKNOWN
     load_decision: LoadDecision | None = None
