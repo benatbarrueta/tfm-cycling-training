@@ -5,6 +5,8 @@ import {
   Routes,
 } from "react-router-dom";
 import { AppHeader } from "./components/AppHeader";
+import { DashboardPage } from "./pages/DashboardPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { WeeklyPlan } from "./components/WeeklyPlan";
 import { trainingPlanMock } from "./mocks/trainingPlan";
 import { CalendarPage } from "./pages/CalendarPage";
@@ -37,14 +39,7 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={
-            <PlaceholderPage
-              title="Resumen"
-              description={
-                "Aquí aparecerá el estado actual del ciclista, la próxima sesión y la carga reciente."
-              }
-            />
-          }
+          element={<DashboardPage />}
         />
 
         <Route
@@ -69,6 +64,11 @@ function App() {
               }
             />
           }
+        />
+
+        <Route
+          path="/profile"
+          element={<ProfilePage />}
         />
 
         <Route

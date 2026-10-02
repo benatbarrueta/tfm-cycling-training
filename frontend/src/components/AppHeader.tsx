@@ -45,13 +45,13 @@ export function AppHeader() {
           ))}
         </nav>
 
-        <button
+        <NavLink
           className="app-header__profile"
-          type="button"
+          to="/profile"
           aria-label="Abrir perfil"
         >
           BB
-        </button>
+        </NavLink>
       </div>
     </header>
   );

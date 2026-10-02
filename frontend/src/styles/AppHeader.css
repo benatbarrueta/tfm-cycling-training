@@ -122,6 +122,7 @@
 
   .app-header__profile {
     margin-left: auto;
+    text-decoration: none;
   }
 
   .app-header__navigation {

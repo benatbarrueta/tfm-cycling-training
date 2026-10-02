@@ -1,0 +1,181 @@
+.profile-page {
+  display: grid;
+  width: min(100% - 2rem, 60rem);
+  margin: 0 auto;
+  padding: 3rem 0;
+  gap: 1.5rem;
+}
+
+.profile-page__header h1,
+.profile-page__header p {
+  margin: 0;
+}
+
+.profile-page__header h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+}
+
+.profile-page__header > p:last-child {
+  max-width: 42rem;
+  margin-top: 0.75rem;
+  color: #637068;
+  line-height: 1.5;
+}
+
+.profile-page__eyebrow {
+  margin-bottom: 0.4rem !important;
+  color: #27734b;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.profile-form {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dce5df;
+  border-radius: 1rem;
+  box-shadow: 0 0.5rem 1.5rem rgb(25 55 38 / 8%);
+}
+
+.profile-form__section {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e3e9e5;
+}
+
+.profile-form__section header {
+  margin-bottom: 1.25rem;
+}
+
+.profile-form__section h2,
+.profile-form__section p {
+  margin: 0;
+}
+
+.profile-form__section p {
+  margin-top: 0.25rem;
+  color: #637068;
+}
+
+.profile-form__grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.profile-form__field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.profile-form__field > span {
+  color: #35483d;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.profile-form__field input,
+.profile-form__field select {
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.65rem 0.75rem;
+  color: #17211b;
+  background: #f8faf8;
+  border: 1px solid #cad6ce;
+  border-radius: 0.65rem;
+  outline: none;
+}
+
+.profile-form__field input:focus,
+.profile-form__field select:focus {
+  background: #ffffff;
+  border-color: #2e8b57;
+  box-shadow: 0 0 0 3px rgb(46 139 87 / 15%);
+}
+
+.profile-form__field small,
+.profile-form__error {
+  color: #a13727;
+}
+
+.profile-form__days {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.profile-form__days label {
+  cursor: pointer;
+}
+
+.profile-form__days input {
+  position: absolute;
+  opacity: 0;
+}
+
+.profile-form__days span {
+  display: grid;
+  min-height: 2.8rem;
+  padding: 0.5rem;
+  place-items: center;
+  color: #4f6157;
+  background: #f4f7f5;
+  border: 1px solid #cad6ce;
+  border-radius: 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.profile-form__days input:checked + span {
+  color: #ffffff;
+  background: #27734b;
+  border-color: #27734b;
+}
+
+.profile-form__days input:focus-visible + span {
+  box-shadow: 0 0 0 3px rgb(46 139 87 / 20%);
+}
+
+.profile-form__footer {
+  display: flex;
+  padding: 1.25rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #f7f9f7;
+}
+
+.profile-form__footer p {
+  margin: 0;
+  color: #637068;
+}
+
+.profile-form__footer button {
+  min-height: 2.8rem;
+  padding: 0 1.2rem;
+  color: #ffffff;
+  background: #27734b;
+  border: 0;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+@media (max-width: 680px) {
+  .profile-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-form__days {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-form__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
