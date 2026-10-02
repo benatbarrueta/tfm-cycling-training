@@ -1,130 +1,529 @@
 # TFM — Cycling Training
 
-Motor determinista de planes de entrenamiento y preparación de datos para ML.
+Sistema híbrido que estima la respuesta aeróbica del ciclista y adapta un
+generador determinista de planes de entrenamiento.
+
+El proyecto combina:
+
+- Procesamiento de datos de GoldenCheetah OpenData.
+- Auditoría de potencia y frecuencia cardiaca.
+- Construcción de datasets sin fuga temporal.
+- Comparación de modelos entre atletas.
+- Estimación personalizada de la respuesta aeróbica.
+- Adaptación de la carga semanal.
+- Generación determinista de sesiones de entrenamiento.
 
 ## Entorno y pruebas
+
+Crear y activar el entorno virtual:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
+
+Instalar las dependencias:
+
+```bash
 python -m pip install -r requirements.txt
+```
+
+Ejecutar todos los tests:
+
+```bash
 python -m pytest
 ```
 
-## Importar GoldenCheetah OpenData
+## Demostración del plan personalizado
 
-Desde la raíz del repositorio, con el entorno activado:
+El ejemplo completo construye un ciclista, incorpora su historial de carga y
+respuesta aeróbica, adapta la carga semanal y genera las sesiones:
+
+```bash
+python -m app.demo_training_plan
+```
+
+El resultado incluye:
+
+- Desacoplamiento aeróbico esperado.
+- Clasificación de la respuesta aeróbica.
+- Decisión de aumentar, mantener o reducir la carga.
+- TSS objetivo de la semana.
+- Día, tipo, duración, potencia y TSS de cada sesión.
+
+El flujo principal es:
+
+```text
+actividades históricas
+        ↓
+estimación de la respuesta aeróbica
+        ↓
+clasificación de la respuesta
+        ↓
+decisión de carga
+        ↓
+TSS semanal objetivo
+        ↓
+generador determinista
+        ↓
+sesiones concretas
+```
+
+Un resultado simplificado tiene esta estructura:
+
+```json
+{
+  "target_tss": 263.5,
+  "expected_aerobic_decoupling": 7.0,
+  "aerobic_response": "ELEVATED",
+  "load_decision": "REDUCE",
+  "workouts": [
+    {
+      "day": "TUESDAY",
+      "workout_type": "ENDURANCE",
+      "duration_minutes": 90,
+      "estimated_tss": 98.5,
+      "target_power_min": 150,
+      "target_power_max": 190
+    }
+  ]
+}
+```
+
+## Datos de GoldenCheetah OpenData
+
+Los datos originales se guardan localmente en:
+
+```text
+data/raw/
+```
+
+Los resultados del procesamiento se guardan en:
+
+```text
+data/processed/
+```
+
+Estas carpetas pueden contener información deportiva sensible y archivos de
+gran tamaño. Los datos originales y los datasets generados no deben subirse
+al repositorio.
+
+Los informes pequeños y reproducibles pueden versionarse cuando sean
+necesarios para documentar un experimento.
+
+## Importación de resúmenes semanales
+
+El módulo `app.data.goldencheetah` importa los resúmenes JSON de varios
+atletas:
 
 ```bash
 python -m app.data.goldencheetah \
-  /ruta/al/atleta-1 /ruta/al/atleta-2 \
+  /ruta/al/atleta-1 \
+  /ruta/al/atleta-2 \
   --output data/processed/pilot
 ```
 
-Cada entrada es una carpeta con un único resumen JSON o la ruta al JSON.
-No necesita pandas, acceso a Internet ni los CSV de series temporales.
-Genera `activities.csv`, `weekly.csv` y `audit.json`. Reutilizar el directorio
-sobrescribe esos tres archivos. No guardar datos de atletas en Git.
+Cada entrada puede ser:
+
+- Una carpeta con un único resumen JSON.
+- La ruta directa al resumen JSON.
+
+El importador genera:
+
+```text
+activities.csv
+weekly.csv
+audit.json
+```
+
+Reutilizar el mismo directorio de salida sobrescribe estos tres archivos.
 
 ### Normalización
 
-- Solo actividades `Bike`; fechas del JSON en UTC y semanas lunes-domingo.
-- Métricas escalares o pares `[valor, peso]`; se conserva el primer componente
-  de los pares seleccionados, no de arrays arbitrarios. Valores negativos,
-  no numéricos y no finitos se consideran ausentes.
-- Usa `coggan_tss`, `coggan_np` y `coggan_if` originales; no mezcla las variantes
-  `a_coggan_*` ni inventa FTP a partir de `cp_setting`.
-- Conserva duración en segundos en actividades y minutos decimales en semanas.
-- Duplicados idénticos por fecha se omiten y auditan. Duplicados conflictivos
-  o entradas repetidas del mismo atleta producen un error.
-- Fechas inválidas se omiten y cuentan en la auditoría. Revisar ese contador
-  antes de utilizar el dataset.
+La importación aplica las siguientes reglas:
+
+- Sólo se conservan actividades cuyo deporte sea `Bike`.
+- Las fechas del resumen se interpretan en UTC.
+- Las semanas se organizan de lunes a domingo.
+- Las métricas pueden ser escalares o pares `[valor, peso]`.
+- En los pares seleccionados se conserva el primer componente.
+- Los valores negativos, no numéricos o no finitos se consideran ausentes.
+- Se utilizan `coggan_tss`, `coggan_np` y `coggan_if`.
+- No se mezclan las variantes `a_coggan_*`.
+- No se inventa el FTP a partir de `cp_setting`.
+- La duración se conserva en segundos para las actividades.
+- La duración semanal se expresa en minutos decimales.
+
+Los duplicados idénticos por fecha se omiten y quedan registrados en la
+auditoría. Los duplicados conflictivos o las entradas repetidas del mismo
+atleta provocan un error.
+
+Las fechas inválidas se omiten y se contabilizan en `audit.json`.
 
 ### Calidad semanal
 
-`observed_tss` es la suma de los TSS disponibles, que puede ser parcial.
-`tss_coverage` mide cobertura de las actividades registradas, no garantiza que
-el atleta haya registrado todos sus entrenamientos. `weekly_tss` solo se rellena
-si todas las actividades tienen TSS, no hay alertas de duración y no es una
-semana de borde. `usable_load_week` identifica ese criterio técnico; no implica
-una validación fisiológica ni que la fila ya sea apta para entrenar ML.
+`observed_tss` es la suma de los valores TSS disponibles. Puede representar
+una carga parcial.
 
-Las semanas sin registros tienen carga desconocida (celda vacía), nunca cero.
-La primera y última semana de cada exportación se marcan conservadoramente como
-`boundary_week`, porque no conocemos la cobertura fuera de sus extremos.
-Duraciones inferiores a un minuto o superiores a 12 horas requieren revisión;
-el límite superior se cambia con `--max-duration-hours`. Es una heurística de
-calidad, no una razón para borrar automáticamente una actividad larga real.
+`tss_coverage` mide la cobertura de TSS de las actividades registradas, pero
+no garantiza que el atleta haya registrado todos sus entrenamientos.
 
-Este importador es independiente de `Activity` y del motor de recomendaciones
-para conservar datos incompletos sin forzar campos obligatorios del modelo
-de dominio. La construcción del dataset y la evaluación de modelos se realizan
-en los módulos descritos a continuación.
+`weekly_tss` sólo se rellena cuando:
 
-## Organización de datos
+- Todas las actividades de la semana tienen TSS.
+- No existen alertas de duración.
+- La semana no es una semana de borde.
+
+`usable_load_week` identifica el cumplimiento de estos criterios técnicos.
+No supone una validación fisiológica.
+
+Las semanas sin actividades registradas tienen carga desconocida. No se
+interpretan automáticamente como semanas con cero TSS.
+
+La primera y la última semana de cada exportación se marcan como
+`boundary_week`, porque se desconoce la cobertura fuera del intervalo
+exportado.
+
+Las actividades con duración inferior a un minuto o superior a doce horas
+requieren revisión. El límite superior se puede modificar con:
 
 ```text
-data/
-├── raw/                         # Datos originales de los atletas
-└── processed/
-    ├── weekly.csv               # Tabla semanal conjunta
-    ├── tss_features.csv         # Ventanas sin etiqueta
-    ├── tss_labeled.csv          # Ventanas con TSS de la semana siguiente
-    └── evaluation/
-        ├── linear_baseline_cv.csv
-        └── balanced_linear_cv.csv
+--max-duration-hours
 ```
 
-`data/raw/` y `data/processed/` están excluidos de Git. Los datos originales
-deben conservarse por separado para poder reproducir el procesamiento.
-El importador recibe carpetas descomprimidas o archivos JSON, no ZIP directamente.
+## Auditoría de la respuesta aeróbica
 
-## Construcción del dataset
+El módulo `app.data.response_audit` trabaja directamente con los ZIP de
+GoldenCheetah OpenData.
 
-El módulo `app.data.weekly_features` agrupa las semanas por atleta, las ordena
-cronológicamente y construye ventanas de cuatro semanas consecutivas.
+Cada ZIP debe contener:
 
-Una ventana se acepta únicamente si:
+- Un resumen JSON del atleta.
+- Los CSV con las series temporales de las actividades.
 
-- Las cuatro fechas están separadas por siete días.
-- Todas las semanas tienen `usable_load_week=True`.
-- Ninguna tiene `weekly_tss` ausente.
-
-Las ventanas se desplazan una semana cada vez, por lo que pueden solaparse.
-No se unen semanas separadas por huecos.
-
-### Variables
-
-| Campo | Descripción |
-|---|---|
-| `athlete_id` | Identificador para agrupación y evaluación |
-| `window_start` | Inicio de la primera semana de la ventana |
-| `window_end` | Inicio de la última semana de la ventana |
-| `tss_latest` | TSS de la última semana |
-| `tss_previous` | TSS de la penúltima semana |
-| `tss_mean_4w` | Media de TSS de las cuatro semanas |
-| `tss_change_pct` | Cambio porcentual entre penúltima y última semana |
-
-Si el TSS de la penúltima semana es cero, `tss_change_pct` queda ausente,
-porque el cambio porcentual no está definido.
-
-Para generar las variables:
+Para ejecutar la auditoría:
 
 ```bash
-python -m app.data.weekly_features \
-  data/processed/weekly.csv \
-  --output data/processed/tss_features.csv
+python -u -m app.data.response_audit \
+  data/raw/*.zip \
+  --signal-coverage \
+  --decoupling-output data/processed/decoupling_comparisons.csv \
+  --response-output data/processed/response_dataset.csv
+```
+
+La opción `-u` hace que Python muestre la salida inmediatamente mientras
+procesa los archivos.
+
+### Emparejamiento de actividades
+
+Las actividades del resumen JSON se emparejan con los CSV utilizando:
+
+- La fecha UTC de la actividad.
+- La fecha codificada en el nombre del CSV.
+- Los posibles desfases horarios detectados para cada atleta.
+
+La auditoría contabiliza:
+
+- Actividades emparejadas.
+- Actividades sin pareja.
+- Coincidencias ambiguas.
+- CSV inválidos.
+- CSV vacíos.
+- Desfases horarios encontrados.
+
+### Calidad de las señales
+
+Para cada actividad candidata se revisa:
+
+- Cobertura conjunta de potencia y frecuencia cardiaca.
+- Duración de la señal.
+- Orden del eje temporal.
+- Saltos temporales.
+- Duración del tramo continuo más largo.
+- Variabilidad de potencia.
+- Proporción de muestras con potencia cero.
+- Equilibrio de potencia entre las dos mitades.
+
+Una actividad sólo se utiliza para construir el dataset de respuesta cuando
+cumple los controles de calidad configurados.
+
+Los criterios actuales incluyen:
+
+- Al menos veinte minutos de señal continua emparejada.
+- Coeficiente de variación de potencia menor o igual a `0.75`.
+- Proporción de potencia cero menor o igual a `0.20`.
+- Relación de potencia entre mitades mayor o igual a `0.80`.
+- Cobertura completa de TSS en las ventanas históricas.
+- Carga crónica positiva.
+- Al menos tres respuestas aeróbicas anteriores del atleta.
+
+## Cálculo del desacoplamiento aeróbico
+
+El desacoplamiento compara la relación potencia/frecuencia cardiaca entre las
+dos mitades de un tramo continuo:
+
+```text
+ratio_primera_mitad = potencia_media_1 / frecuencia_cardiaca_media_1
+ratio_segunda_mitad = potencia_media_2 / frecuencia_cardiaca_media_2
+```
+
+A partir de esas relaciones se calcula el cambio porcentual.
+
+La auditoría conserva tanto el valor calculado como el valor informado por
+GoldenCheetah para poder compararlos:
+
+```text
+reported_decoupling
+calculated_decoupling
+difference
+```
+
+El dataset principal utiliza como objetivo:
+
+```text
+target_aerobic_decoupling
+```
+
+## Dataset de respuesta
+
+El dataset final se guarda normalmente en:
+
+```text
+data/processed/response_dataset.csv
+```
+
+Cada fila representa una actividad elegible y contiene información de la
+sesión, del historial anterior y de la respuesta observada.
+
+### Variables de la sesión
+
+```text
+session_duration_minutes
+session_intensity_factor
+session_tss
+```
+
+### Variables de carga histórica
+
+```text
+previous_7d_tss
+previous_7d_activity_count
+previous_7d_tss_coverage
+previous_28d_tss
+previous_28d_activity_count
+previous_28d_tss_coverage
+```
+
+### Variables relativas de carga
+
+```text
+acute_chronic_load_ratio
+session_to_chronic_load_ratio
+```
+
+### Historial de respuesta personal
+
+```text
+previous_response_median
+previous_response_count
 ```
 
 ### Variable objetivo
 
-Con `--with-target` se añaden:
+```text
+target_aerobic_decoupling
+```
 
-- `target_week`: inicio de la semana inmediatamente posterior a la ventana.
-- `next_week_tss`: TSS observado durante esa semana.
+Todas las variables históricas se calculan utilizando exclusivamente
+actividades anteriores a la actividad objetivo.
 
-Solo se conservan filas cuya semana objetivo existe, es utilizable y tiene TSS.
-No se salta una semana ausente para buscar una etiqueta posterior.
+La respuesta de la propia actividad nunca se incluye entre sus variables de
+entrada.
+
+## Evaluación de modelos de respuesta
+
+La evaluación se realiza por atleta. En cada iteración se deja fuera un atleta
+completo, se entrena con los demás y se evalúa sobre el atleta no visto.
+
+Esto evita que actividades del mismo ciclista aparezcan simultáneamente en
+entrenamiento y evaluación.
+
+Para ejecutar la validación completa:
+
+```bash
+python -m app.data.response_evaluation \
+  data/processed/response_dataset.csv \
+  --full-cv
+```
+
+El experimento actual contiene:
+
+- 1324 actividades elegibles.
+- 10 atletas.
+
+### Métodos comparados
+
+Se comparan los siguientes métodos:
+
+1. Mediana global del conjunto de entrenamiento.
+2. Mediana histórica personal.
+3. Regresión lineal.
+4. Regresión lineal equilibrada por atleta.
+5. Regresión Ridge.
+6. Random Forest.
+
+La métrica principal es el error absoluto medio por atleta:
+
+```text
+MAE medio por atleta
+```
+
+Primero se calcula el MAE de cada ciclista y después se promedian los
+resultados. De esta forma, los atletas con muchas actividades no dominan la
+métrica final.
+
+### Resultados
+
+| Método | MAE medio por atleta |
+|---|---:|
+| Mediana global | 5,83 |
+| Mediana personal | **5,50** |
+| Regresión lineal | 5,57 |
+| Regresión lineal equilibrada | 5,70 |
+| Ridge | 5,57 |
+| Random Forest | 5,77 |
+
+La mediana histórica personal obtiene el menor error medio por atleta.
+
+Los modelos más complejos no muestran una mejora consistente frente a esta
+referencia. Por ese motivo, la primera integración con el generador utiliza
+la mediana personal.
+
+Las regresiones y Random Forest se conservan como comparaciones
+experimentales.
+
+## Integración con el generador determinista
+
+El motor utiliza las actividades anteriores del ciclista para estimar su
+respuesta aeróbica.
+
+Se requieren al menos tres valores anteriores de desacoplamiento.
+
+La estimación utilizada actualmente es:
+
+```text
+mediana de los desacoplamientos anteriores del ciclista
+```
+
+La respuesta se clasifica en:
+
+- `UNKNOWN`: no existe historial suficiente.
+- `STABLE`: el desacoplamiento esperado es menor o igual al 5 %.
+- `ELEVATED`: el desacoplamiento esperado es superior al 5 %.
+
+### Política de adaptación
+
+La decisión original basada en la evolución semanal de TSS se combina con la
+respuesta aeróbica:
+
+- Una respuesta `STABLE` conserva la decisión basada en la carga.
+- Una respuesta `UNKNOWN` conserva la decisión basada en la carga.
+- Una respuesta `ELEVATED` impide aumentar la carga.
+- Si la respuesta es elevada y la carga estaba creciendo, se reduce.
+- Si la respuesta es elevada y la carga estaba estable o descendiendo, se
+  mantiene.
+
+### Decisiones posibles
+
+```text
+INCREASE
+MAINTAIN
+REDUCE
+```
+
+La decisión se convierte en un objetivo semanal:
+
+- `INCREASE`: aumenta el TSS objetivo un 5 %.
+- `MAINTAIN`: mantiene el TSS actual.
+- `REDUCE`: reduce el TSS objetivo un 15 %.
+
+Después, el generador determinista distribuye ese objetivo entre los días
+disponibles y prescribe sesiones compatibles con:
+
+- Modalidad.
+- Nivel.
+- FTP.
+- Horas semanales.
+- Días disponibles.
+- Objetivo deportivo.
+- Fase de preparación.
+
+## Resultado del plan
+
+El modelo `TrainingPlan` contiene:
+
+```text
+target_tss
+expected_aerobic_decoupling
+aerobic_response
+load_decision
+workouts
+```
+
+Cada `Workout` puede contener:
+
+```text
+day
+workout_type
+target_tss
+estimated_tss
+duration_minutes
+target_power_min
+target_power_max
+warmup
+intervals
+cooldown
+```
+
+El servicio `build_training_plan_summary` convierte el plan en un diccionario
+preparado para:
+
+- Serialización JSON.
+- Una futura API.
+- Una interfaz web o móvil.
+- Informes de resultados.
+- Demostraciones del sistema.
+
+## Experimento exploratorio de carga semanal
+
+Antes de seleccionar el enfoque de respuesta aeróbica se realizó un
+experimento para predecir el TSS de la semana siguiente.
+
+El módulo `app.data.weekly_features` construye ventanas de cuatro semanas
+consecutivas.
+
+Una ventana se acepta cuando:
+
+- Las cuatro fechas están separadas por siete días.
+- Todas las semanas tienen `usable_load_week=True`.
+- Ninguna semana tiene `weekly_tss` ausente.
+
+Las variables utilizadas son:
+
+```text
+tss_latest
+tss_previous
+tss_mean_4w
+tss_change_pct
+```
+
+La etiqueta es:
+
+```text
+next_week_tss
+```
+
+Para construir el dataset:
 
 ```bash
 python -m app.data.weekly_features \
@@ -133,161 +532,137 @@ python -m app.data.weekly_features \
   --with-target
 ```
 
-El objetivo es **predecir la carga observada**, no determinar la carga óptima
-ni una recomendación validada de entrenamiento.
-
-En el lote analizado se obtuvieron:
-
-- 620 ventanas de cuatro semanas, correspondientes a 10 atletas.
-- 526 ventanas con etiqueta de la semana siguiente.
-
-Estos recuentos dependen de los archivos y controles de calidad utilizados.
-Las ventanas solapadas no son observaciones independientes.
-
-## Modelos y referencias
-
-Se comparan cuatro métodos:
-
-1. **Persistencia:** predice el TSS de la última semana.
-2. **Media de cuatro semanas:** predice `tss_mean_4w`.
-3. **Regresión lineal:** aprende a combinar tres variables de carga.
-4. **Regresión lineal equilibrada:** usa las mismas variables, ponderando
-   las filas para que cada atleta tenga el mismo peso total al entrenar.
-
-Las entradas de ambas regresiones son:
-
-```text
-tss_latest
-tss_previous
-tss_mean_4w
-```
-
-El objetivo es `next_week_tss`. El identificador, las fechas y el objetivo
-no se incluyen en las entradas. `tss_change_pct` todavía no se utiliza.
-
-En el modelo equilibrado, el peso de cada fila es:
-
-```text
-1 / número de filas del atleta en el conjunto de entrenamiento
-```
-
-Los pesos se calculan exclusivamente con las filas utilizadas para entrenar
-cada modelo.
-
-## Evaluación
-
-La métrica es el error absoluto medio, MAE, expresado en TSS.
-Un valor menor indica menor error de predicción.
-
-- **MAE global:** da el mismo peso a cada fila.
-- **MAE medio por atleta:** calcula primero el MAE de cada atleta y después
-  promedia esos valores, dando el mismo peso a cada ciclista.
-
-La separación se realiza por atleta para que sus ventanas solapadas no
-aparezcan simultáneamente en entrenamiento y evaluación.
-
-### Separación utilizada
-
-Se reservan estos dos atletas para evaluación:
-
-```text
-025bad5c-1cfc-4c22-a2e3-2be1ccb70008
-031c70de-6ccd-48f8-ac62-d50eb3d75387
-```
-
-La partición contiene:
-
-- 436 filas de ocho atletas para entrenamiento y validación interna.
-- 90 filas de dos atletas reservados para evaluación.
-
-Dentro de las 436 filas se realiza validación dejando fuera un atleta cada vez:
-se entrena con siete atletas y se valida con el octavo, durante ocho iteraciones.
-
-Esta evaluación estudia la generalización a atletas no vistos. No equivale
-a una evaluación temporal de semanas futuras de atletas conocidos.
-
-### Ejecutar solo la validación interna
+Para evaluar los métodos:
 
 ```bash
 python -m app.data.evaluation \
   data/processed/tss_labeled.csv \
   --test-athletes \
   025bad5c-1cfc-4c22-a2e3-2be1ccb70008 \
-  031c70de-6ccd-48f8-ac62-d50eb3d75387 \
-  --cv-only \
-  --cv-output data/processed/evaluation/balanced_linear_cv.csv
+  031c70de-6ccd-48f8-ac62-d50eb3d75387
 ```
 
-`--cv-only` excluye los dos atletas reservados y termina después de la
-validación interna. El CSV contiene una fila por atleta de validación.
+Este experimento se conserva como trabajo exploratorio. Predecir la carga que
+un ciclista realizará no equivale a determinar qué carga debería recomendar
+el sistema.
 
-Sin `--cv-only`, el comando también entrena la regresión original con las
-436 filas y la evalúa, junto con las referencias, sobre las 90 filas reservadas.
-La regresión equilibrada se compara actualmente en validación interna.
+Por ese motivo, el enfoque principal pasó a estimar la respuesta del ciclista
+y utilizarla para adaptar un generador determinista.
 
-`--cv-output` permite elegir el archivo de resultados. Su valor predeterminado
-es `data/processed/evaluation/linear_baseline_cv.csv`.
-Reutilizar una ruta sobrescribe el archivo; usar nombres distintos para
-conservar resultados de experimentos anteriores.
+## Estructura principal del proyecto
 
-### Resultados de validación interna
+```text
+app/
+├── config/
+│   ├── cold_start_rules.py
+│   ├── objective_rules.py
+│   ├── power_zones.py
+│   └── training_rules.py
+├── data/
+│   ├── evaluation.py
+│   ├── goldencheetah.py
+│   ├── linear_model.py
+│   ├── ml_dataset.py
+│   ├── response_audit.py
+│   ├── response_evaluation.py
+│   └── weekly_features.py
+├── models/
+│   ├── activity.py
+│   ├── aerobic_response.py
+│   ├── cyclist.py
+│   ├── load_decision.py
+│   ├── training_plan.py
+│   ├── training_state.py
+│   └── workout.py
+├── services/
+│   ├── aerobic_response_service.py
+│   ├── cold_start_service.py
+│   ├── load_decision_service.py
+│   ├── metrics.py
+│   ├── training_engine_service.py
+│   ├── training_plan_service.py
+│   └── training_plan_summary_service.py
+└── demo_training_plan.py
 
-Métrica principal: MAE medio por atleta.
+tests/
+├── test_response_audit.py
+├── test_response_evaluation.py
+├── test_aerobic_response_service.py
+├── test_load_decision_service.py
+├── test_training_engine_service.py
+└── test_training_plan_summary_service.py
+```
 
-| Método | MAE (TSS) |
-|---|---:|
-| Persistencia | 179,67 |
-| Media de cuatro semanas | **140,79** |
-| Regresión lineal | 155,87 |
-| Regresión equilibrada por atleta | 146,11 |
+## Privacidad y control de versiones
 
-La ponderación mejora la regresión en 9,76 TSS, pero no supera la media de
-cuatro semanas en la métrica principal. La regresión equilibrada mejora
-respecto a esa referencia en cinco de los ocho atletas.
+No deben subirse a Git:
 
-### Primera evaluación en los dos atletas reservados
+- ZIP originales de atletas.
+- CSV de series temporales.
+- Resúmenes JSON originales.
+- Datasets procesados con identificadores de atletas.
+- Entornos virtuales.
+- Variables de entorno.
 
-| Método | MAE global (TSS) | MAE medio por atleta (TSS) |
-|---|---:|---:|
-| Persistencia | 192,57 | 186,07 |
-| Media de cuatro semanas | 179,92 | 174,95 |
-| Regresión lineal | 176,51 | 172,92 |
+El `.gitignore` excluye:
 
-La pequeña ventaja de la regresión en esta partición no se reproduce en
-la validación interna. Estos resultados son exploratorios y no demuestran
-una superioridad general del modelo.
+```text
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.env
+.env.*
+data/raw/
+data/processed/
+```
 
-Los resultados de los dos atletas reservados ya se han consultado durante
-el desarrollo. Los siguientes ajustes se comparan mediante validación interna;
-una evaluación final independiente requerirá datos adicionales no utilizados
-para tomar decisiones.
+Los informes versionados deben evitar datos personales y contener únicamente
+resultados necesarios para reproducir o documentar los experimentos.
 
-### Diagnóstico de cobertura
+## Limitaciones
 
-`outside_range_count` cuenta las ventanas cuya media de cuatro semanas queda
-fuera del mínimo y máximo observados en el entrenamiento de esa partición.
+El proyecto presenta actualmente estas limitaciones:
 
-Se detectaron siete ventanas fuera de rango:
+- El dataset contiene únicamente diez atletas.
+- La distribución de actividades por atleta está desequilibrada.
+- GoldenCheetah OpenData no garantiza el registro completo del entrenamiento.
+- El desacoplamiento depende de la calidad de potencia y frecuencia cardiaca.
+- La mediana personal no utiliza todavía las características de una sesión
+  futura concreta.
+- La clasificación del 5 % simplifica una respuesta fisiológica continua.
+- La política de adaptación no representa una validación clínica.
+- No existe todavía una API ni una interfaz de usuario.
+- La generalización debe evaluarse con más atletas y datos externos.
 
-- Cinco del atleta `029abbce-69c2-42fc-ad44-a85541cd98b4`.
-- Dos del atleta `02a72bf5-d3cf-4502-ac7f-1828abb367ae`.
+## Estado actual
 
-En este último caso, las medias eran 34,80 y 36,87 TSS, mientras que el mínimo
-de entrenamiento era 69,71 TSS. La regresión original sobreestimó ambas cargas.
+Están implementados:
 
-Este indicador analiza solo una variable. Estar dentro del rango no garantiza
-una predicción fiable. No se eliminan filas ni se sustituyen predicciones
-automáticamente por este diagnóstico.
+- Importación de resúmenes GoldenCheetah.
+- Procesamiento de múltiples atletas.
+- Auditoría de emparejamiento entre JSON y CSV.
+- Control de calidad de potencia, frecuencia cardiaca y tiempo.
+- Comparación del desacoplamiento calculado e informado.
+- Construcción del dataset sin fuga temporal.
+- Validación dejando fuera un atleta completo.
+- Comparación de referencias y modelos de aprendizaje automático.
+- Estimación personalizada de la respuesta aeróbica.
+- Adaptación de la decisión de carga.
+- Generación determinista de sesiones.
+- Trazabilidad de la recomendación.
+- Resumen serializable del plan.
+- Demostración ejecutable de extremo a extremo.
 
-## Estado y siguientes pasos
+## Siguientes pasos
 
-La importación, las ventanas semanales, las etiquetas observadas, las
-referencias y las dos variantes de regresión están implementadas.
+Los siguientes desarrollos previstos son:
 
-La media de cuatro semanas sigue siendo la mejor referencia según la
-validación interna. El siguiente experimento previsto es incorporar variables
-de volumen y frecuencia a partir de las semanas históricas.
-
-Los modelos todavía no están integrados en el generador determinista.
-Antes de utilizarlos para adaptar entrenamientos será necesario justificar
-cómo una predicción de carga observada se convierte en una recomendación.
+1. Convertir datos reales del ciclista en objetos `Activity`.
+2. Persistir el historial de actividades y respuestas.
+3. Exponer el generador mediante una API.
+4. Añadir una interfaz para consultar el calendario semanal.
+5. Mostrar al ciclista la explicación de cada adaptación.
+6. Ampliar el número y variedad de atletas.
+7. Evaluar la calibración temporal en ciclistas conocidos.
+8. Revisar la política de adaptación con un especialista en entrenamiento.
