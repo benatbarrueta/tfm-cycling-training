@@ -88,6 +88,22 @@ def calculate_activity_metrics(
     if ftp <= 0:
         raise ValueError("Threshold power (FTP) must be greater than zero.")
 
+    if (
+        activity.duration_minutes is None
+        or activity.duration_minutes <= 0
+    ):
+        raise ValueError(
+            "La actividad necesita una duración positiva."
+        )
+
+    if (
+        activity.normalized_power is None
+        or activity.normalized_power <= 0
+    ):
+        raise ValueError(
+            "La actividad necesita potencia normalizada positiva."
+        )
+
     activity.intensity_factor = calculate_if(
         normalized_power=activity.normalized_power,
         ftp=ftp

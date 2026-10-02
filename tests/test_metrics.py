@@ -1,16 +1,16 @@
+import pytest
+
 from datetime import date
 
-from app.models.training_state import LoadTrend
 from app.models.activity import Activity
-
+from app.models.training_state import LoadTrend
 from app.services.metrics import (
-    calculate_if, 
-    calculate_tss, 
-    calculate_weekly_tss, 
+    calculate_activity_metrics,
+    calculate_if,
     calculate_load_trend,
-    calculate_activity_metrics
+    calculate_tss,
+    calculate_weekly_tss,
 )
-
 
 def test_calculate_if():
     result = calculate_if(
@@ -19,7 +19,6 @@ def test_calculate_if():
     )
 
     assert result == 0.8
-
 
 def test_calculate_tss():
     result = calculate_tss(
@@ -43,7 +42,6 @@ def test_load_trend_increasing():
 
     assert result == LoadTrend.INCREASING
 
-
 def test_load_trend_decreasing():
     result = calculate_load_trend(
         weekly_tss=250,
@@ -51,7 +49,6 @@ def test_load_trend_decreasing():
     )
 
     assert result == LoadTrend.DECREASING
-
 
 def test_load_trend_stable():
     result = calculate_load_trend(

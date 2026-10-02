@@ -13,3 +13,4 @@ class TrainingPlan:
     expected_aerobic_decoupling: float | None = None
     aerobic_response: AerobicResponse = AerobicResponse.UNKNOWN
     load_decision: LoadDecision | None = None
+    response_prediction_method: str = "unavailable"

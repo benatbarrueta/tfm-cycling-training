@@ -1,0 +1,34 @@
+{
+  "model_type": "balanced_linear_regression",
+  "target": "calculated_aerobic_decoupling",
+  "feature_columns": [
+    "session_duration_minutes",
+    "session_intensity_factor",
+    "session_tss",
+    "previous_7d_tss",
+    "previous_7d_activity_count",
+    "previous_28d_tss",
+    "previous_28d_activity_count",
+    "acute_chronic_load_ratio",
+    "session_to_chronic_load_ratio",
+    "previous_response_median",
+    "previous_response_count"
+  ],
+  "intercept": -5.726564929332957,
+  "coefficients": [
+    0.0210714228995592,
+    17.789580416746848,
+    -0.036274445671758866,
+    0.002585827783009647,
+    0.34581983469093547,
+    -0.0017730673705813724,
+    -0.06180576586927114,
+    -2.331083178523766,
+    0.7171503500961388,
+    0.5861937277292423,
+    -0.0017254718723832114
+  ],
+  "training_rows": 2039,
+  "training_athletes": 10,
+  "athlete_weighting": "equal_total_weight"
+}

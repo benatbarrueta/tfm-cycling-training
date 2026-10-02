@@ -67,6 +67,9 @@ def build_training_plan_summary(
         "expected_aerobic_decoupling": (
             plan.expected_aerobic_decoupling
         ),
+        "response_prediction_method": (
+            plan.response_prediction_method
+        ),
         "aerobic_response": plan.aerobic_response.value,
         "load_decision": (
             plan.load_decision.value

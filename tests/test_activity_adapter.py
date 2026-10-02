@@ -9,6 +9,7 @@ from app.data.activity_adapter import (
     activity_from_goldencheetah_ride,
     activities_from_goldencheetah_data,
     load_goldencheetah_activities,
+    build_calculated_response_lookup,
 )
 
 def test_signed_metric_accepts_negative_value():
@@ -31,12 +32,13 @@ def test_activity_from_goldencheetah_ride():
             "coggan_np": ["200", "3600"],
             "coggan_if": ["0.80", "3600"],
             "coggan_tss": ["64", "3600"],
-            "aerobic_decoupling": ["-2.5", "1"],
+            "aerobic_decoupling": ["-120", "1"],
         },
     }
 
     result = activity_from_goldencheetah_ride(
-        ride
+        ride,
+        aerobic_decoupling=-2.5,
     )
 
     assert result is not None
@@ -363,3 +365,68 @@ def test_load_goldencheetah_activities_from_zip(
     assert activities[0].date == date(2026, 1, 10)
     assert audit["athlete_id"] == "athlete-a"
     assert audit["imported_activities"] == 1
+
+def test_build_calculated_response_lookup():
+    comparisons = [
+        {
+            "ride_date": "2026/01/01 10:00:00 UTC",
+            "calculated_decoupling": -2.5,
+            "power_cv": 0.30,
+            "zero_power_fraction": 0.05,
+            "power_balance_ratio": 0.90,
+        },
+        {
+            "ride_date": "2026/01/02 10:00:00 UTC",
+            "calculated_decoupling": 20.0,
+            "power_cv": 0.90,
+            "zero_power_fraction": 0.05,
+            "power_balance_ratio": 0.90,
+        },
+    ]
+
+    result = build_calculated_response_lookup(
+        comparisons
+    )
+
+    assert result == {
+        "2026/01/01 10:00:00 UTC": -2.5,
+    }
+
+def test_activity_ignores_reported_decoupling_without_audit():
+    ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "workout_time": 3600,
+            "average_power": 180,
+            "coggan_np": 200,
+            "coggan_tss": 64,
+            "aerobic_decoupling": -120.0,
+        },
+    }
+
+    result = activity_from_goldencheetah_ride(
+        ride
+    )
+
+    assert result is not None
+    assert result.aerobic_decoupling is None
+
+def test_activity_adapter_preserves_tss_only_activity():
+    ride = {
+        "date": "2026/01/10 10:00:00 UTC",
+        "sport": "Bike",
+        "METRICS": {
+            "coggan_tss": 75,
+        },
+    }
+
+    result = activity_from_goldencheetah_ride(
+        ride
+    )
+
+    assert result is not None
+    assert result.tss == pytest.approx(75)
+    assert result.duration_minutes is None
+    assert result.average_power is None
+    assert result.normalized_power is None

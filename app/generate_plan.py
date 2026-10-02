@@ -6,9 +6,14 @@ from pathlib import Path
 from app.data.activity_adapter import (
     load_goldencheetah_activities,
 )
+from app.data.response_model import (
+    load_response_model_artifact,
+)
+
 from app.models.activity import Activity
 from app.models.cyclist import Cyclist, Level, Modality
 from app.models.training_objective import Objective
+
 from app.services.training_engine_service import (
     generate_personalized_training_plan,
 )
@@ -115,6 +120,17 @@ def main() -> None:
         ),
     )
 
+    parser.add_argument(
+        "--response-model",
+        type=Path,
+        default=Path(
+            "artifacts/response_balanced_linear.json"
+        ),
+        help=(
+            "Artefacto JSON del modelo de respuesta."
+        ),
+    )
+
     args = parser.parse_args()
 
     activities, audit = load_goldencheetah_activities(
@@ -131,6 +147,12 @@ def main() -> None:
         if args.reference_date is not None
         else calculate_default_reference_date(
             activities
+        )
+    )
+
+    response_model_artifact = (
+        load_response_model_artifact(
+            args.response_model
         )
     )
 
@@ -151,12 +173,20 @@ def main() -> None:
         modality=Modality(args.modality),
         activities=activities,
         reference_date=reference_date,
+        response_model_artifact=(
+            response_model_artifact
+        ),
     )
 
     result = {
         "source_audit": audit,
         "reference_date": reference_date.isoformat(),
-        "plan": build_training_plan_summary(plan),
+        "response_model": str(
+            args.response_model
+        ),
+        "plan": build_training_plan_summary(
+            plan
+        ),
     }
 
     print(
