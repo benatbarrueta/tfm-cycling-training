@@ -15,9 +15,11 @@ import {
 import { es } from "date-fns/locale";
 import { ActivityForm } from "../components/ActivityForm";
 import { CalendarToolbar } from "../components/CalendarToolbar";
-import {CompletedActivityCard,} from "../components/CompletedActivityCard";
+import {
+  CompletedActivityCard,
+} from "../components/CompletedActivityCard";
 import { useActivities } from "../hooks/useActivities";
-import { trainingPlanMock } from "../mocks/trainingPlan";
+import { seasonPlanMock } from "../mocks/seasonPlan";
 import type {
   CalendarDay,
   CalendarView,
@@ -28,9 +30,24 @@ import "../styles/CalendarPage.css";
 const statusLabels = {
   rest: "Descanso",
   planned: "Planificado",
+  provisional: "Por definir",
   completed: "Completado",
   partial: "Parcial",
   missed: "No realizado",
+} as const;
+
+const phaseLabels = {
+  BASE: "Base",
+  BUILD: "Construcción",
+  PEAK: "Pico",
+  TAPER: "Descarga",
+} as const;
+
+const weekStatusLabels = {
+  PROVISIONAL: "Provisional",
+  ACTIVE: "Activa",
+  COMPLETED: "Completada",
+  ADAPTED: "Adaptada",
 } as const;
 
 function capitalize(value: string): string {
@@ -115,14 +132,21 @@ function getCalendarTitle(
 }
 
 export function CalendarPage() {
-  const planResponse = trainingPlanMock;
+  const seasonPlan = seasonPlanMock;
+
+  const activeWeek = seasonPlan.weeks.find(
+    (week) => week.status === "ACTIVE",
+  );
 
   const [view, setView] =
     useState<CalendarView>("week");
 
   const [selectedDate, setSelectedDate] =
     useState(() =>
-      parseISO(planResponse.reference_date),
+      parseISO(
+        activeWeek?.week_start ??
+          seasonPlan.start_date,
+      ),
     );
 
   const [
@@ -141,6 +165,18 @@ export function CalendarPage() {
     [selectedDate, view],
   );
 
+  const selectedDateText = format(
+    selectedDate,
+    "yyyy-MM-dd",
+  );
+
+  const selectedWeek =
+    seasonPlan.weeks.find(
+      (week) =>
+        selectedDateText >= week.week_start &&
+        selectedDateText <= week.week_end,
+    ) ?? null;
+
   const calendarDays = useMemo<CalendarDay[]>(
     () =>
       visibleDates.map((date) => {
@@ -149,9 +185,19 @@ export function CalendarPage() {
           "yyyy-MM-dd",
         );
 
+        const plannedWeek =
+          seasonPlan.weeks.find(
+            (week) =>
+              isoDate >= week.week_start &&
+              isoDate <= week.week_end,
+          ) ?? null;
+
+        const trainingPlan =
+          plannedWeek?.training_plan ?? null;
+
         const prediction =
-          planResponse.plan
-            .workout_response_predictions
+          trainingPlan
+            ?.workout_response_predictions
             .find(
               (item) =>
                 item.session_date === isoDate,
@@ -160,15 +206,16 @@ export function CalendarPage() {
         const plannedWorkout =
           prediction === null
             ? null
-            : planResponse.plan.workouts.find(
+            : trainingPlan?.workouts.find(
                 (workout) =>
                   workout.day === prediction.day,
               ) ?? null;
 
-        const dayActivities = activities.filter(
-          (activity) =>
-            activity.date === isoDate,
-        );
+        const dayActivities =
+          activities.filter(
+            (activity) =>
+              activity.date === isoDate,
+          );
 
         let status: CalendarDay["status"];
 
@@ -176,12 +223,17 @@ export function CalendarPage() {
           status = "completed";
         } else if (plannedWorkout !== null) {
           status = "planned";
+        } else if (
+          plannedWeek?.status === "PROVISIONAL"
+        ) {
+          status = "provisional";
         } else {
           status = "rest";
         }
 
         return {
           date: isoDate,
+          planned_week: plannedWeek,
           planned_workout: plannedWorkout,
           activities: dayActivities,
           response_prediction: prediction,
@@ -190,7 +242,7 @@ export function CalendarPage() {
       }),
     [
       activities,
-      planResponse,
+      seasonPlan,
       visibleDates,
     ],
   );
@@ -261,6 +313,62 @@ export function CalendarPage() {
         onNext={() => movePeriod(1)}
       />
 
+      {selectedWeek !== null && (
+        <section
+          className={[
+            "calendar-page__week-summary",
+            `calendar-page__week-summary--${selectedWeek.status.toLowerCase()}`,
+          ].join(" ")}
+        >
+          <div>
+            <span>
+              {phaseLabels[selectedWeek.phase]}
+            </span>
+
+            <strong>
+              Semana{" "}
+              {weekStatusLabels[
+                selectedWeek.status
+              ].toLowerCase()}
+            </strong>
+          </div>
+
+          <dl>
+            <div>
+              <dt>TSS previsto</dt>
+              <dd>
+                {selectedWeek.planned_tss.toFixed(
+                  0,
+                )}
+              </dd>
+            </div>
+
+            <div>
+              <dt>TSS realizado</dt>
+              <dd>
+                {selectedWeek.completed_tss.toFixed(
+                  0,
+                )}
+              </dd>
+            </div>
+          </dl>
+
+          {selectedWeek.adaptation_reason && (
+            <p>
+              {selectedWeek.adaptation_reason}
+            </p>
+          )}
+
+          {selectedWeek.status ===
+            "PROVISIONAL" && (
+            <p>
+              Las sesiones concretas se generarán
+              cuando esta semana pase a estar activa.
+            </p>
+          )}
+        </section>
+      )}
+
       {view !== "day" && (
         <div className="calendar-page__weekdays">
           {[
@@ -272,9 +380,7 @@ export function CalendarPage() {
             "Sáb",
             "Dom",
           ].map((day) => (
-            <span key={day}>
-              {day}
-            </span>
+            <span key={day}>{day}</span>
           ))}
         </div>
       )}
@@ -287,10 +393,18 @@ export function CalendarPage() {
       >
         {calendarDays.map((day) => {
           const date = parseISO(day.date);
-          const workout =
-            day.planned_workout;
+          const workout = day.planned_workout;
           const prediction =
             day.response_prediction;
+          const plannedWeek =
+            day.planned_week;
+
+          const isWeekStart =
+            plannedWeek?.week_start === day.date;
+
+          const isObjectiveDate =
+            day.date ===
+            seasonPlan.objective_date;
 
           const completedDuration =
             day.activities.reduce(
@@ -306,7 +420,8 @@ export function CalendarPage() {
           const completedTss =
             day.activities.reduce(
               (total, activity) =>
-                total + (activity.tss ?? 0),
+                total +
+                (activity.tss ?? 0),
               0,
             );
 
@@ -344,10 +459,52 @@ export function CalendarPage() {
                     : format(date, "d")}
                 </span>
 
-                <small>
-                  {statusLabels[day.status]}
-                </small>
+                {!(
+                  view === "month" &&
+                  day.status === "provisional" &&
+                  !isWeekStart
+                ) && (
+                  <small>
+                    {statusLabels[day.status]}
+                  </small>
+                )}                
               </button>
+
+              {isObjectiveDate && (
+                <div className="calendar-day__objective">
+                  Carrera objetivo
+                </div>
+              )}
+
+              {view === "month" &&
+                isWeekStart &&
+                plannedWeek !== null && (
+                  <div
+                    className={[
+                      "calendar-day__week-plan",
+                      `calendar-day__week-plan--${plannedWeek.phase.toLowerCase()}`,
+                    ].join(" ")}
+                  >
+                    <strong>
+                      {phaseLabels[
+                        plannedWeek.phase
+                      ]}
+                    </strong>
+
+                    <span>
+                      {plannedWeek.planned_tss.toFixed(
+                        0,
+                      )}{" "}
+                      TSS
+                    </span>
+
+                    <small>
+                      {weekStatusLabels[
+                        plannedWeek.status
+                      ]}
+                    </small>
+                  </div>
+                )}
 
               {workout !== null ? (
                 <div className="calendar-day__workout">
@@ -356,19 +513,17 @@ export function CalendarPage() {
                   </strong>
 
                   <span>
-                    {workout.duration_minutes ??
-                      "—"}{" "}
-                    min
+                    {workout.duration_minutes ?? "—"} min
                   </span>
 
                   <span>
-                    {workout.estimated_tss
-                      ?.toFixed(0) ?? "—"}{" "}
+                    {workout.estimated_tss?.toFixed(0) ??
+                      "—"}{" "}
                     TSS
                   </span>
 
                   {prediction !== null && (
-                    <span>
+                    <span className="calendar-day__prediction">
                       Respuesta prevista:{" "}
                       {prediction
                         .predicted_aerobic_decoupling
@@ -377,12 +532,20 @@ export function CalendarPage() {
                     </span>
                   )}
                 </div>
-              ) : (
+              ) : plannedWeek?.status ===
+                "PROVISIONAL" ? (
+                view === "day" ? (
+                  <p className="calendar-day__rest">
+                    Las sesiones concretas se generarán cuando
+                    esta semana pase a estar activa.
+                  </p>
+                ) : null
+              ) : view === "day" ||
+                plannedWeek?.status === "ACTIVE" ? (
                 <p className="calendar-day__rest">
-                  Día sin entrenamiento
-                  planificado
+                  Día sin entrenamiento planificado
                 </p>
-              )}
+              ) : null}             
 
               {day.activities.length > 0 && (
                 <div className="calendar-day__completed">
@@ -426,7 +589,8 @@ export function CalendarPage() {
       </section>
 
       {view === "day" &&
-        calendarDays[0]?.activities.length > 0 && (
+        calendarDays[0]?.activities.length >
+          0 && (
           <section className="calendar-page__activities">
             <h2>Actividades realizadas</h2>
 

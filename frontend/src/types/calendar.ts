@@ -4,6 +4,10 @@ import type {
   WorkoutResponsePrediction,
 } from "./training";
 
+import type {
+  PlannedWeek,
+} from "./season";
+
 export type CalendarView =
   | "month"
   | "week"
@@ -12,12 +16,14 @@ export type CalendarView =
 export type CalendarDayStatus =
   | "rest"
   | "planned"
+  | "provisional"
   | "completed"
   | "partial"
   | "missed";
 
 export interface CalendarDay {
   date: string;
+  planned_week: PlannedWeek | null;
   planned_workout: Workout | null;
   activities: ActivityRecord[];
   response_prediction:

@@ -6,15 +6,90 @@
   gap: 1rem;
 }
 
+/* Resumen de la semana seleccionada */
+
+.calendar-page__week-summary {
+  display: flex;
+  padding: 1rem;
+  align-items: center;
+  gap: 2rem;
+  background: #ffffff;
+  border: 1px solid #dce5df;
+  border-left: 5px solid #718078;
+  border-radius: 0.75rem;
+}
+
+.calendar-page__week-summary--active {
+  border-left-color: #38a169;
+}
+
+.calendar-page__week-summary--completed {
+  border-left-color: #3182ce;
+}
+
+.calendar-page__week-summary--adapted {
+  border-left-color: #d69e2e;
+}
+
+.calendar-page__week-summary--provisional {
+  border-left-color: #805ad5;
+}
+
+.calendar-page__week-summary > div span,
+.calendar-page__week-summary > div strong {
+  display: block;
+}
+
+.calendar-page__week-summary > div span {
+  color: #27734b;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.calendar-page__week-summary > div strong {
+  margin-top: 0.2rem;
+  text-transform: capitalize;
+}
+
+.calendar-page__week-summary dl {
+  display: flex;
+  margin: 0;
+  gap: 1.5rem;
+}
+
+.calendar-page__week-summary dt {
+  color: #637068;
+  font-size: 0.7rem;
+}
+
+.calendar-page__week-summary dd {
+  margin: 0.2rem 0 0;
+  font-weight: 800;
+}
+
+.calendar-page__week-summary > p {
+  max-width: 28rem;
+  margin: 0 0 0 auto;
+  color: #637068;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Cabecera de días */
+
 .calendar-page__weekdays {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns:
+    repeat(7, minmax(0, 1fr));
   color: #637068;
   font-size: 0.75rem;
   font-weight: 800;
   text-align: center;
   text-transform: uppercase;
 }
+
+/* Rejillas */
 
 .calendar-page__grid {
   display: grid;
@@ -23,15 +98,16 @@
 
 .calendar-page__grid--month,
 .calendar-page__grid--week {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns:
+    repeat(7, minmax(0, 1fr));
 }
 
 .calendar-page__grid--month {
-  grid-auto-rows: minmax(8rem, auto);
+  grid-auto-rows: 12rem;
 }
 
 .calendar-page__grid--week {
-  grid-auto-rows: minmax(22rem, auto);
+  grid-auto-rows: minmax(18rem, auto);
 }
 
 .calendar-page__grid--day {
@@ -39,9 +115,12 @@
   justify-content: center;
 }
 
+/* Día */
+
 .calendar-day {
   min-width: 0;
   padding: 0.75rem;
+  overflow: hidden;
   background: #ffffff;
   border: 1px solid #dce5df;
   border-radius: 0.75rem;
@@ -63,12 +142,17 @@
   border-top: 4px solid #c94c3b;
 }
 
+.calendar-day--provisional {
+  background: #faf9fc;
+  border-top: 3px solid #d6c9ed;
+}
+
 .calendar-day--rest {
   background: #f4f6f4;
 }
 
 .calendar-day--outside {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 .calendar-day__date {
@@ -77,6 +161,7 @@
   padding: 0;
   align-items: center;
   justify-content: space-between;
+  gap: 0.4rem;
   color: #17211b;
   background: transparent;
   border: 0;
@@ -85,11 +170,77 @@
   text-align: left;
 }
 
+.calendar-day__date span {
+  flex-shrink: 0;
+}
+
 .calendar-day__date small {
+  overflow: hidden;
   color: #718078;
   font-size: 0.65rem;
   font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+/* Resumen semanal dentro del lunes */
+
+.calendar-day__week-plan {
+  display: grid;
+  margin-top: 0.55rem;
+  padding: 0.55rem;
+  gap: 0.15rem;
+  color: #ffffff;
+  border-radius: 0.5rem;
+}
+
+.calendar-day__week-plan strong,
+.calendar-day__week-plan span,
+.calendar-day__week-plan small {
+  display: block;
+  color: inherit;
+  line-height: 1.2;
+}
+
+.calendar-day__week-plan strong {
+  font-size: 0.72rem;
+}
+
+.calendar-day__week-plan span,
+.calendar-day__week-plan small {
+  font-size: 0.62rem;
+}
+
+.calendar-day__week-plan--base {
+  background: #3182ce;
+}
+
+.calendar-day__week-plan--build {
+  background: #805ad5;
+}
+
+.calendar-day__week-plan--peak {
+  background: #dd6b20;
+}
+
+.calendar-day__week-plan--taper {
+  background: #2f855a;
+}
+
+/* Objetivo */
+
+.calendar-day__objective {
+  margin-top: 0.55rem;
+  padding: 0.5rem;
+  color: #ffffff;
+  background: #b83280;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* Entrenamiento planificado */
 
 .calendar-day__workout {
   display: grid;
@@ -98,8 +249,11 @@
 }
 
 .calendar-day__workout strong {
+  overflow: hidden;
   color: #245c3d;
   font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .calendar-day__workout span {
@@ -111,71 +265,10 @@
   margin: 0.8rem 0 0;
   color: #8a948e;
   font-size: 0.75rem;
+  line-height: 1.35;
 }
 
-.calendar-day__add {
-  width: 100%;
-  min-height: 2.8rem;
-  margin-top: 1.5rem;
-  color: #ffffff;
-  background: #27734b;
-  border: 0;
-  border-radius: 0.65rem;
-  cursor: pointer;
-  font-weight: 750;
-}
-
-.calendar-page__grid--day .calendar-day {
-  padding: 1.5rem;
-}
-
-.calendar-page__grid--day .calendar-day__date span {
-  font-size: 1.4rem;
-  text-transform: capitalize;
-}
-
-.calendar-page__grid--day .calendar-day__workout {
-  padding: 1.25rem;
-  background: #edf4ff;
-  border-radius: 0.75rem;
-}
-
-.calendar-page__grid--day .calendar-day__workout strong {
-  font-size: 1.2rem;
-}
-
-.calendar-page__grid--day .calendar-day__workout span {
-  font-size: 0.95rem;
-}
-
-@media (max-width: 900px) {
-  .calendar-page__grid--week {
-    grid-template-columns: 1fr;
-    grid-auto-rows: auto;
-  }
-
-  .calendar-page__grid--week
-    .calendar-day {
-    min-height: 10rem;
-  }
-
-  .calendar-page__grid--week
-    + .calendar-page__weekdays,
-  .calendar-page__weekdays {
-    display: none;
-  }
-}
-
-@media (max-width: 680px) {
-  .calendar-page__grid--month {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .calendar-page__grid--month
-    .calendar-day--outside {
-    display: none;
-  }
-}
+/* Actividad realizada */
 
 .calendar-day__completed {
   display: grid;
@@ -195,6 +288,102 @@
   font-size: 0.75rem;
 }
 
+.calendar-day__add {
+  width: 100%;
+  min-height: 2.8rem;
+  margin-top: 1.5rem;
+  color: #ffffff;
+  background: #27734b;
+  border: 0;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+/* Vista mensual */
+
+.calendar-page__grid--month .calendar-day {
+  padding: 0.65rem;
+}
+
+.calendar-page__grid--month
+  .calendar-day__date span {
+  font-size: 1rem;
+}
+
+.calendar-page__grid--month
+  .calendar-day__date small {
+  font-size: 0.6rem;
+}
+
+.calendar-page__grid--month
+  .calendar-day__workout {
+  margin-top: 0.55rem;
+  gap: 0.15rem;
+}
+
+.calendar-page__grid--month
+  .calendar-day__workout strong {
+  font-size: 0.72rem;
+}
+
+.calendar-page__grid--month
+  .calendar-day__workout span {
+  font-size: 0.65rem;
+}
+
+.calendar-page__grid--month
+  .calendar-day__prediction {
+  display: none;
+}
+
+.calendar-page__grid--month
+  .calendar-day__completed {
+  padding: 0.5rem;
+}
+
+.calendar-page__grid--month
+  .calendar-day__completed strong {
+  font-size: 0.7rem;
+}
+
+.calendar-page__grid--month
+  .calendar-day__completed span {
+  font-size: 0.62rem;
+}
+
+/* Vista diaria */
+
+.calendar-page__grid--day .calendar-day {
+  padding: 1.5rem;
+  overflow: visible;
+}
+
+.calendar-page__grid--day
+  .calendar-day__date span {
+  font-size: 1.4rem;
+  text-transform: capitalize;
+}
+
+.calendar-page__grid--day
+  .calendar-day__workout {
+  padding: 1.25rem;
+  background: #edf4ff;
+  border-radius: 0.75rem;
+}
+
+.calendar-page__grid--day
+  .calendar-day__workout strong {
+  font-size: 1.2rem;
+}
+
+.calendar-page__grid--day
+  .calendar-day__workout span {
+  font-size: 0.95rem;
+}
+
+/* Lista detallada de actividades */
+
 .calendar-page__activities {
   display: grid;
   width: min(100%, 48rem);
@@ -204,4 +393,58 @@
 
 .calendar-page__activities h2 {
   margin: 0;
+}
+
+/* Responsive */
+
+@media (max-width: 900px) {
+  .calendar-page__grid--week {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+
+  .calendar-page__grid--week
+    .calendar-day {
+    min-height: 9rem;
+  }
+
+  .calendar-page__week-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .calendar-page__week-summary > p {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .calendar-page__week-summary {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .calendar-page__grid--month {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 10rem;
+  }
+
+  .calendar-page__grid--month
+    .calendar-day--outside {
+    display: none;
+  }
+
+  .calendar-page__weekdays {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .calendar-page__grid--month {
+    grid-template-columns: 1fr;
+  }
 }

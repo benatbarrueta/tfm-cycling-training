@@ -7,29 +7,10 @@ import {
 import { AppHeader } from "./components/AppHeader";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { WeeklyPlan } from "./components/WeeklyPlan";
-import { trainingPlanMock } from "./mocks/trainingPlan";
+import { SeasonPlanPage, } from "./pages/SeasonPlanPage";
 import { CalendarPage } from "./pages/CalendarPage";
+import { ProgressPage } from "./pages/ProgressPage";
 import "./styles/App.css";
-
-function PlaceholderPage({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <main className="placeholder-page">
-      <p className="placeholder-page__eyebrow">
-        Cycling Training
-      </p>
-
-      <h1>{title}</h1>
-      <p>{description}</p>
-    </main>
-  );
-}
 
 function App() {
   return (
@@ -49,21 +30,12 @@ function App() {
 
         <Route
           path="/plan"
-          element={
-            <WeeklyPlan plan={trainingPlanMock.plan} />
-          }
+          element={<SeasonPlanPage />}
         />
 
         <Route
           path="/progress"
-          element={
-            <PlaceholderPage
-              title="Evolución"
-              description={
-                "Aquí mostraremos la carga, el desacoplamiento aeróbico y su evolución."
-              }
-            />
-          }
+          element={<ProgressPage />}
         />
 
         <Route
