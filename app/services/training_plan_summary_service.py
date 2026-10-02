@@ -70,6 +70,34 @@ def build_training_plan_summary(
         "response_prediction_method": (
             plan.response_prediction_method
         ),
+        "response_evaluated_target_tss": (
+            plan.response_evaluated_target_tss
+        ),
+        "workout_response_predictions": [
+            {
+                "day": prediction["day"],
+                "session_date": (
+                    prediction["session_date"].isoformat()
+                ),
+                "predicted_aerobic_decoupling": (
+                    prediction[
+                        "predicted_aerobic_decoupling"
+                    ]
+                ),
+                "aerobic_response": (
+                    prediction[
+                        "aerobic_response"
+                    ].value
+                ),
+                "outside_training_range_features": (
+                    prediction[
+                        "outside_training_range_features"
+                    ]
+                ),
+            }
+            for prediction
+            in plan.workout_response_predictions
+        ],
         "aerobic_response": plan.aerobic_response.value,
         "load_decision": (
             plan.load_decision.value

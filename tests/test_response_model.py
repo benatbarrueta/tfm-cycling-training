@@ -6,6 +6,7 @@ from app.data.response_model import (
     predict_response_from_artifact,
     save_response_model_artifact,
     train_response_model_artifact,
+    find_outside_training_range_features,
 )
 
 def make_model_row(
@@ -113,3 +114,33 @@ def test_predict_response_rejects_missing_feature():
             artifact,
             {},
         )
+
+def test_find_outside_training_range_features():
+    artifact = {
+        "feature_columns": [
+            "session_tss",
+            "previous_7d_tss",
+        ],
+        "feature_ranges": {
+            "session_tss": {
+                "min": 20,
+                "max": 200,
+            },
+            "previous_7d_tss": {
+                "min": 0,
+                "max": 800,
+            },
+        },
+    }
+
+    result = find_outside_training_range_features(
+        artifact,
+        {
+            "session_tss": 250,
+            "previous_7d_tss": 400,
+        },
+    )
+
+    assert result == [
+        "session_tss",
+    ]

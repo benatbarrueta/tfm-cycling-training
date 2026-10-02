@@ -9,9 +9,10 @@ El proyecto combina:
 - Auditoría de potencia y frecuencia cardiaca.
 - Construcción de datasets sin fuga temporal.
 - Comparación de modelos entre atletas.
-- Estimación personalizada de la respuesta aeróbica.
+- Predicción de la respuesta a sesiones futuras.
 - Adaptación de la carga semanal.
-- Generación determinista de sesiones de entrenamiento.
+- Generación determinista de entrenamientos.
+- Trazabilidad de las decisiones del sistema.
 
 ## Entorno y pruebas
 
@@ -34,60 +35,73 @@ Ejecutar todos los tests:
 python -m pytest
 ```
 
-## Demostración del plan personalizado
+## Demostración con datos sintéticos
 
-El ejemplo completo construye un ciclista, incorpora su historial de carga y
-respuesta aeróbica, adapta la carga semanal y genera las sesiones:
+El proyecto incluye un ejemplo pequeño que construye manualmente un ciclista y
+su historial:
 
 ```bash
 python -m app.demo_training_plan
 ```
 
-El resultado incluye:
+Este ejemplo permite comprobar el funcionamiento básico del generador sin
+utilizar datos reales.
 
-- Desacoplamiento aeróbico esperado.
-- Clasificación de la respuesta aeróbica.
+## Generación desde GoldenCheetah
+
+Para generar un plan desde un ZIP real de GoldenCheetah:
+
+```bash
+python -u -m app.generate_plan \
+  data/raw/atleta.zip \
+  --ftp 250 \
+  --weekly-hours 8 \
+  --available-days TUESDAY WEDNESDAY FRIDAY SUNDAY \
+  --modality XCO \
+  --level INTERMEDIATE \
+  --objective PERFORMANCE
+```
+
+El modelo de respuesta utilizado por defecto es:
+
+```text
+artifacts/response_balanced_linear.json
+```
+
+Se puede indicar otro artefacto mediante:
+
+```bash
+--response-model /ruta/al/modelo.json
+```
+
+La salida incluye:
+
+- Auditoría de las actividades importadas.
+- Fecha de referencia del plan.
+- Modelo de respuesta utilizado.
+- TSS solicitado por la decisión.
+- TSS finalmente factible.
+- Respuesta aeróbica prevista para cada sesión.
+- Variables situadas fuera de los rangos de entrenamiento.
 - Decisión de aumentar, mantener o reducir la carga.
-- TSS objetivo de la semana.
-- Día, tipo, duración, potencia y TSS de cada sesión.
+- Día, tipo, duración, potencia y TSS de cada entrenamiento.
 
 El flujo principal es:
 
 ```text
+GoldenCheetah OpenData
+        ↓
 actividades históricas
         ↓
-estimación de la respuesta aeróbica
+plan candidato
         ↓
-clasificación de la respuesta
+predicción de respuesta por sesión
         ↓
-decisión de carga
+adaptación de carga
         ↓
-TSS semanal objetivo
-        ↓
-generador determinista
+plan final factible
         ↓
 sesiones concretas
-```
-
-Un resultado simplificado tiene esta estructura:
-
-```json
-{
-  "target_tss": 263.5,
-  "expected_aerobic_decoupling": 7.0,
-  "aerobic_response": "ELEVATED",
-  "load_decision": "REDUCE",
-  "workouts": [
-    {
-      "day": "TUESDAY",
-      "workout_type": "ENDURANCE",
-      "duration_minutes": 90,
-      "estimated_tss": 98.5,
-      "target_power_min": 150,
-      "target_power_max": 190
-    }
-  ]
-}
 ```
 
 ## Datos de GoldenCheetah OpenData
@@ -136,7 +150,7 @@ weekly.csv
 audit.json
 ```
 
-Reutilizar el mismo directorio de salida sobrescribe estos tres archivos.
+Reutilizar el mismo directorio de salida sobrescribe esos tres archivos.
 
 ### Normalización
 
@@ -147,16 +161,21 @@ La importación aplica las siguientes reglas:
 - Las semanas se organizan de lunes a domingo.
 - Las métricas pueden ser escalares o pares `[valor, peso]`.
 - En los pares seleccionados se conserva el primer componente.
-- Los valores negativos, no numéricos o no finitos se consideran ausentes.
+- Las métricas de carga, potencia y duración negativas se consideran ausentes.
+- El desacoplamiento aeróbico admite valores negativos finitos.
+- Los valores no numéricos o no finitos se consideran ausentes.
 - Se utilizan `coggan_tss`, `coggan_np` y `coggan_if`.
 - No se mezclan las variantes `a_coggan_*`.
 - No se inventa el FTP a partir de `cp_setting`.
-- La duración se conserva en segundos para las actividades.
+- La duración se conserva en segundos en la exportación de actividades.
 - La duración semanal se expresa en minutos decimales.
 
-Los duplicados idénticos por fecha se omiten y quedan registrados en la
-auditoría. Los duplicados conflictivos o las entradas repetidas del mismo
-atleta provocan un error.
+Los duplicados idénticos por fecha y hora se omiten y quedan registrados en la
+auditoría.
+
+Los duplicados conflictivos con la misma fecha y hora provocan un error.
+
+Se permiten varias actividades diferentes durante el mismo día.
 
 Las fechas inválidas se omiten y se contabilizan en `audit.json`.
 
@@ -185,7 +204,7 @@ La primera y la última semana de cada exportación se marcan como
 exportado.
 
 Las actividades con duración inferior a un minuto o superior a doce horas
-requieren revisión. El límite superior se puede modificar con:
+requieren revisión. El límite superior se puede modificar mediante:
 
 ```text
 --max-duration-hours
@@ -270,7 +289,7 @@ ratio_segunda_mitad = potencia_media_2 / frecuencia_cardiaca_media_2
 A partir de esas relaciones se calcula el cambio porcentual.
 
 La auditoría conserva tanto el valor calculado como el valor informado por
-GoldenCheetah para poder compararlos:
+GoldenCheetah:
 
 ```text
 reported_decoupling
@@ -278,11 +297,11 @@ calculated_decoupling
 difference
 ```
 
-El dataset principal utiliza como objetivo:
+El valor informado se conserva para auditoría, pero el dataset utiliza como
+objetivo el desacoplamiento calculado sobre el tramo continuo.
 
-```text
-target_aerobic_decoupling
-```
+Esta decisión se tomó porque se encontraron diferencias extremas entre la
+métrica informada y las señales observadas en determinadas actividades.
 
 ## Dataset de respuesta
 
@@ -334,6 +353,9 @@ previous_response_count
 target_aerobic_decoupling
 ```
 
+`target_aerobic_decoupling` contiene el desacoplamiento calculado a partir de
+las series temporales.
+
 Todas las variables históricas se calculan utilizando exclusivamente
 actividades anteriores a la actividad objetivo.
 
@@ -342,8 +364,15 @@ entrada.
 
 ## Evaluación de modelos de respuesta
 
-La evaluación se realiza por atleta. En cada iteración se deja fuera un atleta
-completo, se entrena con los demás y se evalúa sobre el atleta no visto.
+La evaluación se realiza dejando fuera un atleta completo en cada iteración.
+
+En cada partición:
+
+1. Se entrena con nueve atletas.
+2. Se evalúa con el atleta restante.
+3. Se repite el proceso para los diez atletas.
+4. Se calcula el MAE de cada atleta.
+5. Se promedian los diez errores.
 
 Esto evita que actividades del mismo ciclista aparezcan simultáneamente en
 entrenamiento y evaluación.
@@ -358,7 +387,7 @@ python -m app.data.response_evaluation \
 
 El experimento actual contiene:
 
-- 1324 actividades elegibles.
+- 2039 actividades elegibles.
 - 10 atletas.
 
 ### Métodos comparados
@@ -372,59 +401,147 @@ Se comparan los siguientes métodos:
 5. Regresión Ridge.
 6. Random Forest.
 
-La métrica principal es el error absoluto medio por atleta:
+La métrica principal es:
 
 ```text
 MAE medio por atleta
 ```
 
-Primero se calcula el MAE de cada ciclista y después se promedian los
-resultados. De esta forma, los atletas con muchas actividades no dominan la
-métrica final.
+Un valor menor representa un error medio menor en la predicción del
+desacoplamiento aeróbico.
 
 ### Resultados
 
 | Método | MAE medio por atleta |
 |---|---:|
-| Mediana global | 5,83 |
-| Mediana personal | **5,50** |
-| Regresión lineal | 5,57 |
-| Regresión lineal equilibrada | 5,70 |
-| Ridge | 5,57 |
-| Random Forest | 5,77 |
+| Mediana global | 7,11 |
+| Mediana personal | 6,49 |
+| Regresión lineal | 6,44 |
+| Regresión lineal equilibrada | **6,35** |
+| Ridge | 6,44 |
+| Random Forest | 6,70 |
 
-La mediana histórica personal obtiene el menor error medio por atleta.
+La regresión lineal equilibrada obtiene el menor MAE medio y supera la mediana
+personal en ocho de los diez atletas.
 
-Los modelos más complejos no muestran una mejora consistente frente a esta
-referencia. Por ese motivo, la primera integración con el generador utiliza
-la mediana personal.
+La mejora respecto a la mediana personal es de 0,14 puntos, aproximadamente
+un 2,2 %. Es una mejora reducida, por lo que la mediana personal se conserva
+como fallback.
 
-Las regresiones y Random Forest se conservan como comparaciones
-experimentales.
+Random Forest no mejora los resultados y no se utiliza en el motor.
+
+## Artefacto del modelo
+
+El modelo final se entrena con todas las filas elegibles:
+
+```bash
+python -m app.data.response_model \
+  data/processed/response_dataset.csv \
+  --output artifacts/response_balanced_linear.json
+```
+
+El artefacto JSON contiene:
+
+- Tipo de modelo.
+- Variable objetivo.
+- Orden de las variables.
+- Intercepto.
+- Coeficientes.
+- Rangos observados durante el entrenamiento.
+- Número de filas.
+- Número de atletas.
+- Método de ponderación.
+
+No contiene actividades ni identificadores de atletas.
+
+Al tratarse de una regresión lineal, la predicción se realiza directamente a
+partir del intercepto y los coeficientes guardados. No es necesario
+deserializar un objeto interno de scikit-learn durante el uso del motor.
+
+## Conversión al modelo de dominio
+
+El módulo `app.data.activity_adapter` convierte las actividades de
+GoldenCheetah en objetos `Activity`.
+
+El adaptador conserva una actividad cuando:
+
+- Tiene una fecha válida.
+- Es una actividad de ciclismo.
+- Tiene TSS, o dispone de duración y potencia normalizada para calcularlo.
+
+Una actividad puede utilizarse para calcular carga aunque no tenga potencia
+media o potencia normalizada, siempre que ya tenga TSS.
+
+Las respuestas aeróbicas no se copian directamente desde el resumen JSON.
+
+Cuando la entrada es un ZIP:
+
+1. Se leen las series temporales.
+2. Se calcula el desacoplamiento.
+3. Se aplican los filtros de calidad.
+4. Se adjunta a `Activity` únicamente una respuesta calculada y elegible.
+
+Cuando sólo existe un resumen JSON, `aerobic_decoupling` permanece vacío porque
+no se puede auditar la respuesta mediante sus series temporales.
 
 ## Integración con el generador determinista
 
-El motor utiliza las actividades anteriores del ciclista para estimar su
-respuesta aeróbica.
-
-Se requieren al menos tres valores anteriores de desacoplamiento.
-
-La estimación utilizada actualmente es:
+El motor sigue este proceso:
 
 ```text
-mediana de los desacoplamientos anteriores del ciclista
+historial del ciclista
+        ↓
+decisión inicial basada en carga
+        ↓
+generación de un plan candidato
+        ↓
+predicción de cada sesión
+        ↓
+respuesta máxima del plan
+        ↓
+adaptación de carga
+        ↓
+plan final factible
 ```
 
-La respuesta se clasifica en:
+La regresión evalúa cada sesión propuesta utilizando:
 
-- `UNKNOWN`: no existe historial suficiente.
-- `STABLE`: el desacoplamiento esperado es menor o igual al 5 %.
-- `ELEVATED`: el desacoplamiento esperado es superior al 5 %.
+- Duración estimada.
+- Intensidad estimada.
+- TSS estimado.
+- TSS de los siete días anteriores.
+- Frecuencia de los siete días anteriores.
+- TSS de los veintiocho días anteriores.
+- Frecuencia de los veintiocho días anteriores.
+- Relación entre carga aguda y crónica.
+- Relación entre TSS de sesión y carga crónica.
+- Mediana de respuestas anteriores.
+- Número de respuestas anteriores.
+
+Las sesiones anteriores de la misma semana se incorporan progresivamente a la
+carga.
+
+Por ejemplo, la predicción del viernes tiene en cuenta las sesiones
+planificadas para el martes y el miércoles.
+
+La respuesta semanal se define conservadoramente como la mayor predicción de
+las sesiones del plan candidato.
+
+Si no se pueden construir las variables del modelo, el motor utiliza la
+mediana histórica personal.
+
+Si tampoco existen al menos tres respuestas anteriores, la respuesta se
+clasifica como `UNKNOWN`.
+
+### Clasificación de la respuesta
+
+- `UNKNOWN`: no existe información suficiente.
+- `STABLE`: desacoplamiento esperado menor o igual al 5 %.
+- `ELEVATED`: desacoplamiento esperado superior al 5 %.
 
 ### Política de adaptación
 
-La decisión original basada en la evolución semanal de TSS se combina con la
-respuesta aeróbica:
+La decisión basada en la carga semanal se combina con la respuesta prevista:
 
 - Una respuesta `STABLE` conserva la decisión basada en la carga.
 - Una respuesta `UNKNOWN` conserva la decisión basada en la carga.
@@ -447,27 +564,89 @@ La decisión se convierte en un objetivo semanal:
 - `MAINTAIN`: mantiene el TSS actual.
 - `REDUCE`: reduce el TSS objetivo un 15 %.
 
-Después, el generador determinista distribuye ese objetivo entre los días
-disponibles y prescribe sesiones compatibles con:
+## Ajuste por viabilidad
 
-- Modalidad.
-- Nivel.
-- FTP.
-- Horas semanales.
+Después de tomar la decisión, el generador intenta construir una semana que
+respete:
+
+- Horas disponibles.
 - Días disponibles.
+- Nivel del ciclista.
+- Máximo de sesiones intensas.
+- Modalidad.
 - Objetivo deportivo.
 - Fase de preparación.
+- Duraciones y estructuras permitidas.
+
+Si el objetivo solicitado no es factible, el generador lo reduce hasta
+encontrar un plan válido.
+
+Por eso se distinguen:
+
+```text
+requested_target_tss
+target_tss
+feasibility_adjusted
+```
+
+- `requested_target_tss` es el objetivo solicitado por la decisión.
+- `target_tss` es el objetivo finalmente factible.
+- `feasibility_adjusted` indica si fue necesario modificarlo.
+
+## Control del rango del modelo
+
+El artefacto guarda el mínimo y el máximo observado para cada variable.
+
+Antes de presentar una predicción, el sistema comprueba si alguna variable
+queda fuera de esos límites.
+
+Cada sesión incluye:
+
+```text
+outside_training_range_features
+```
+
+Una lista vacía indica que todas las variables individuales están dentro de
+los rangos observados durante el entrenamiento.
+
+Este control detecta extrapolaciones univariantes. No garantiza que la
+combinación completa de variables sea frecuente o esté bien representada.
 
 ## Resultado del plan
 
 El modelo `TrainingPlan` contiene:
 
 ```text
+requested_target_tss
 target_tss
 expected_aerobic_decoupling
+response_prediction_method
+response_evaluated_target_tss
+workout_response_predictions
 aerobic_response
 load_decision
 workouts
+```
+
+`response_prediction_method` puede contener:
+
+```text
+balanced_linear_regression
+personal_median
+unavailable
+```
+
+`response_evaluated_target_tss` indica el TSS del plan candidato sobre el que
+se realizaron las predicciones que provocaron la decisión.
+
+Cada predicción de sesión contiene:
+
+```text
+day
+session_date
+predicted_aerobic_decoupling
+aerobic_response
+outside_training_range_features
 ```
 
 Cada `Workout` puede contener:
@@ -493,6 +672,31 @@ preparado para:
 - Una interfaz web o móvil.
 - Informes de resultados.
 - Demostraciones del sistema.
+
+## Ejemplo de interpretación
+
+En una ejecución real se obtuvo:
+
+```text
+Objetivo solicitado: 567,17 TSS
+Objetivo factible: 438,88 TSS
+Duración total: 477 minutos
+Respuesta máxima prevista: 4,01 %
+Clasificación: STABLE
+Decisión: MAINTAIN
+```
+
+Predicciones por sesión:
+
+| Día | Tipo | Desacoplamiento previsto |
+|---|---|---:|
+| Martes | VO2MAX | 4,01 % |
+| Miércoles | ENDURANCE | 1,80 % |
+| Viernes | THRESHOLD | 3,93 % |
+| Domingo | ENDURANCE | 1,55 % |
+
+Todas las variables de estas sesiones estaban dentro de los rangos
+univariantes observados durante el entrenamiento.
 
 ## Experimento exploratorio de carga semanal
 
@@ -542,12 +746,13 @@ python -m app.data.evaluation \
   031c70de-6ccd-48f8-ac62-d50eb3d75387
 ```
 
-Este experimento se conserva como trabajo exploratorio. Predecir la carga que
-un ciclista realizará no equivale a determinar qué carga debería recomendar
-el sistema.
+Este experimento se conserva como trabajo exploratorio.
+
+Predecir la carga que un ciclista realizará no equivale a determinar qué carga
+debería recomendar el sistema.
 
 Por ese motivo, el enfoque principal pasó a estimar la respuesta del ciclista
-y utilizarla para adaptar un generador determinista.
+y utilizarla para adaptar el generador determinista.
 
 ## Estructura principal del proyecto
 
@@ -559,12 +764,14 @@ app/
 │   ├── power_zones.py
 │   └── training_rules.py
 ├── data/
+│   ├── activity_adapter.py
 │   ├── evaluation.py
 │   ├── goldencheetah.py
 │   ├── linear_model.py
 │   ├── ml_dataset.py
 │   ├── response_audit.py
 │   ├── response_evaluation.py
+│   ├── response_model.py
 │   └── weekly_features.py
 ├── models/
 │   ├── activity.py
@@ -579,16 +786,26 @@ app/
 │   ├── cold_start_service.py
 │   ├── load_decision_service.py
 │   ├── metrics.py
+│   ├── response_prediction_service.py
 │   ├── training_engine_service.py
 │   ├── training_plan_service.py
 │   └── training_plan_summary_service.py
-└── demo_training_plan.py
+├── demo_training_plan.py
+└── generate_plan.py
+
+artifacts/
+└── response_balanced_linear.json
 
 tests/
+├── test_activity_adapter.py
+├── test_aerobic_response_service.py
+├── test_generate_plan.py
+├── test_load_decision_service.py
+├── test_metrics.py
 ├── test_response_audit.py
 ├── test_response_evaluation.py
-├── test_aerobic_response_service.py
-├── test_load_decision_service.py
+├── test_response_model.py
+├── test_response_prediction_service.py
 ├── test_training_engine_service.py
 └── test_training_plan_summary_service.py
 ```
@@ -617,6 +834,9 @@ data/raw/
 data/processed/
 ```
 
+El artefacto lineal puede versionarse porque sólo contiene coeficientes,
+metadatos y rangos agregados. No contiene filas ni identificadores de atletas.
+
 Los informes versionados deben evitar datos personales y contener únicamente
 resultados necesarios para reproducir o documentar los experimentos.
 
@@ -628,8 +848,12 @@ El proyecto presenta actualmente estas limitaciones:
 - La distribución de actividades por atleta está desequilibrada.
 - GoldenCheetah OpenData no garantiza el registro completo del entrenamiento.
 - El desacoplamiento depende de la calidad de potencia y frecuencia cardiaca.
-- La mediana personal no utiliza todavía las características de una sesión
-  futura concreta.
+- La mejora de la regresión equilibrada frente a la mediana personal es
+  reducida y debe confirmarse con más atletas.
+- Los rangos mínimos y máximos sólo detectan extrapolación variable por
+  variable.
+- El desacoplamiento puede tener una interpretación limitada en sesiones
+  interválicas o muy variables.
 - La clasificación del 5 % simplifica una respuesta fisiológica continua.
 - La política de adaptación no representa una validación clínica.
 - No existe todavía una API ni una interfaz de usuario.
@@ -647,9 +871,13 @@ Están implementados:
 - Construcción del dataset sin fuga temporal.
 - Validación dejando fuera un atleta completo.
 - Comparación de referencias y modelos de aprendizaje automático.
-- Estimación personalizada de la respuesta aeróbica.
-- Adaptación de la decisión de carga.
+- Conversión de ZIP reales en actividades del dominio.
+- Entrenamiento y serialización de la regresión equilibrada.
+- Predicción de la respuesta de cada sesión candidata.
+- Comprobación de rangos de entrenamiento.
+- Adaptación mediante la mayor respuesta prevista.
 - Generación determinista de sesiones.
+- Ajuste del plan a las restricciones del ciclista.
 - Trazabilidad de la recomendación.
 - Resumen serializable del plan.
 - Demostración ejecutable de extremo a extremo.
@@ -658,11 +886,10 @@ Están implementados:
 
 Los siguientes desarrollos previstos son:
 
-1. Convertir datos reales del ciclista en objetos `Activity`.
-2. Persistir el historial de actividades y respuestas.
-3. Exponer el generador mediante una API.
-4. Añadir una interfaz para consultar el calendario semanal.
-5. Mostrar al ciclista la explicación de cada adaptación.
-6. Ampliar el número y variedad de atletas.
-7. Evaluar la calibración temporal en ciclistas conocidos.
-8. Revisar la política de adaptación con un especialista en entrenamiento.
+1. Persistir perfiles e historiales de ciclistas.
+2. Exponer el generador mediante una API.
+3. Añadir una interfaz para consultar el calendario semanal.
+4. Ampliar el número y variedad de atletas.
+5. Evaluar la calibración temporal en ciclistas conocidos.
+6. Analizar por separado sesiones continuas e interválicas.
+7. Revisar la política de adaptación con un especialista en entrenamiento.

@@ -46,12 +46,27 @@ def train_response_model_artifact(
         for row in rows
     }
 
+    feature_ranges = {
+        column: {
+            "min": min(
+                float(row[column])
+                for row in rows
+            ),
+            "max": max(
+                float(row[column])
+                for row in rows
+            ),
+        }
+        for column in FEATURE_COLUMNS
+    }
+
     return {
         "model_type": "balanced_linear_regression",
         "target": "calculated_aerobic_decoupling",
         "feature_columns": list(FEATURE_COLUMNS),
         "intercept": intercept,
         "coefficients": coefficients,
+        "feature_ranges": feature_ranges,
         "training_rows": len(rows),
         "training_athletes": len(athlete_ids),
         "athlete_weighting": "equal_total_weight",
@@ -128,6 +143,38 @@ def load_response_model_artifact(
         encoding="utf-8"
     ) as file:
         return json.load(file)
+
+def find_outside_training_range_features(
+    artifact: dict,
+    features: dict,
+) -> list[str]:
+    """Devuelve las variables fuera del rango observado al entrenar."""
+    feature_ranges = artifact.get(
+        "feature_ranges",
+        {}
+    )
+
+    outside_features = []
+
+    for column in artifact["feature_columns"]:
+        limits = feature_ranges.get(column)
+
+        if limits is None:
+            continue
+
+        value = float(
+            features[column]
+        )
+
+        if (
+            value < float(limits["min"])
+            or value > float(limits["max"])
+        ):
+            outside_features.append(
+                column
+            )
+
+    return outside_features
 
 def main() -> None:
     """Entrena y guarda el modelo final de respuesta."""

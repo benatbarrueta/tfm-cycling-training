@@ -17,6 +17,7 @@ from app.services.aerobic_response_service import (
 
 from app.data.response_model import (
     predict_response_from_artifact,
+    find_outside_training_range_features,
 )
 
 DAY_INDEX = {
@@ -263,6 +264,13 @@ def predict_training_plan_responses(
             ftp=ftp,
         )
 
+        outside_features = (
+            find_outside_training_range_features(
+                artifact,
+                features,
+            )
+        )
+
         if features is None:
             predicted_decoupling = None
             aerobic_response = AerobicResponse.UNKNOWN
@@ -280,6 +288,8 @@ def predict_training_plan_responses(
                 )
             )
 
+            outside_features = []
+
         results.append({
             "day": workout.day,
             "session_date": session_date,
@@ -288,6 +298,9 @@ def predict_training_plan_responses(
             ),
             "aerobic_response": aerobic_response,
             "features": features,
+            "outside_training_range_features": (
+                outside_features
+            ),
         })
 
         accumulated_activities.append(

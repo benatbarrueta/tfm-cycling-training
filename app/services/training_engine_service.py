@@ -41,6 +41,8 @@ def generate_personalized_training_plan(
     aerobic_response = AerobicResponse.UNKNOWN
     load_decision = None
     response_prediction_method = "unavailable"
+    response_evaluated_target_tss = None
+    workout_response_predictions = []
 
     if not has_sufficient_training_history(
         activities=activities,
@@ -111,6 +113,14 @@ def generate_personalized_training_plan(
                     )
                 )
 
+                response_evaluated_target_tss = (
+                    candidate_plan.target_tss
+                )
+
+                workout_response_predictions = (
+                    predictions
+                )
+
         if expected_decoupling is None:
             expected_decoupling = (
                 estimate_personal_decoupling_from_activities(
@@ -158,6 +168,13 @@ def generate_personalized_training_plan(
     plan.load_decision = load_decision
     plan.response_prediction_method = (
         response_prediction_method
+    )
+
+    plan.response_evaluated_target_tss = (
+        response_evaluated_target_tss
+    )
+    plan.workout_response_predictions = (
+        workout_response_predictions
     )
 
     return plan

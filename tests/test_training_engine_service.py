@@ -264,3 +264,95 @@ def test_plan_reports_aerobic_response_and_load_decision():
     assert plan.expected_aerobic_decoupling == pytest.approx(7.0)
     assert plan.aerobic_response == AerobicResponse.ELEVATED
     assert plan.load_decision == LoadDecision.REDUCE
+
+def test_response_model_adapts_candidate_plan():
+    cyclist = Cyclist(
+        cyclist_id=1,
+        modalities=[Modality.XCO],
+        level=Level.INTERMEDIATE,
+        ftp=250,
+        weekly_hours=8,
+        available_days=[
+            "TUESDAY",
+            "WEDNESDAY",
+            "FRIDAY",
+            "SUNDAY",
+        ],
+        objective=Objective.PERFORMANCE,
+    )
+
+    activities = [
+        Activity(
+            date=date(2026, 9, 1),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            tss=150,
+            aerobic_decoupling=1.0,
+        ),
+        Activity(
+            date=date(2026, 9, 3),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            tss=150,
+            aerobic_decoupling=2.0,
+        ),
+        Activity(
+            date=date(2026, 9, 7),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            tss=155,
+            aerobic_decoupling=3.0,
+        ),
+        Activity(
+            date=date(2026, 9, 10),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            tss=155,
+        ),
+    ]
+
+    artifact = {
+        "model_type": "test_response_model",
+        "feature_columns": [],
+        "intercept": 10.0,
+        "coefficients": [],
+    }
+
+    plan = generate_personalized_training_plan(
+        cyclist=cyclist,
+        modality=Modality.XCO,
+        activities=activities,
+        reference_date=date(2026, 9, 16),
+        response_model_artifact=artifact,
+    )
+
+    assert plan.expected_aerobic_decoupling == (
+        pytest.approx(10.0)
+    )
+    assert plan.aerobic_response == (
+        AerobicResponse.ELEVATED
+    )
+    assert plan.load_decision == LoadDecision.REDUCE
+    assert plan.requested_target_tss == (
+        pytest.approx(263.5)
+    )
+    assert plan.response_prediction_method == (
+        "test_response_model"
+    )
+
+    assert plan.response_evaluated_target_tss is not None
+    assert len(
+        plan.workout_response_predictions
+    ) == 4
+
+    assert all(
+        prediction[
+            "predicted_aerobic_decoupling"
+        ] == pytest.approx(10.0)
+        for prediction
+        in plan.workout_response_predictions
+    )

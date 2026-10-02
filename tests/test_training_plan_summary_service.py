@@ -43,6 +43,8 @@ def test_build_training_plan_summary():
         "total_duration_minutes": 90,
         "expected_aerobic_decoupling": 7.0,
         "response_prediction_method": "unavailable",
+        "response_evaluated_target_tss": None,
+        "workout_response_predictions": [],
         "aerobic_response": "ELEVATED",
         "load_decision": "REDUCE",
         "workouts": [
@@ -130,5 +132,7 @@ def test_build_cold_start_training_plan_summary():
 
     assert result["expected_aerobic_decoupling"] is None
     assert result["response_prediction_method"] == "unavailable"
+    assert result["response_evaluated_target_tss"] is None
+    assert result["workout_response_predictions"] == []
     assert result["aerobic_response"] == "UNKNOWN"
     assert result["load_decision"] is None
