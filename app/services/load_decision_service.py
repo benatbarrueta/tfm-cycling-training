@@ -1,6 +1,6 @@
 from app.models.load_decision import LoadDecision
 from app.models.training_state import TrainingState
-
+from app.models.aerobic_response import AerobicResponse
 
 def calculate_load_change_percentage(
     current_tss: float,
@@ -23,7 +23,6 @@ def calculate_load_change_percentage(
         (current_tss - previous_tss)
         / previous_tss
     ) * 100
-
 
 def decide_next_load(
     training_state: TrainingState,
@@ -71,3 +70,27 @@ def calculate_target_tss(
         return current_tss * 1.05  # Increase by 10%
     
     return current_tss  # Maintain the same TSS
+
+def decide_next_load(
+    training_state: TrainingState,
+    aerobic_response: AerobicResponse = AerobicResponse.UNKNOWN,
+) -> LoadDecision:
+    """Decide la carga siguiente usando carga reciente y respuesta aeróbica."""
+    change_percentage = calculate_load_change_percentage(
+        current_tss=training_state.weekly_tss,
+        previous_tss=training_state.previous_week_tss,
+    )
+
+    if aerobic_response == AerobicResponse.ELEVATED:
+        if change_percentage > 0:
+            return LoadDecision.REDUCE
+
+        return LoadDecision.MAINTAIN
+
+    if change_percentage > 15:
+        return LoadDecision.REDUCE
+
+    if change_percentage < -10:
+        return LoadDecision.INCREASE
+
+    return LoadDecision.MAINTAIN

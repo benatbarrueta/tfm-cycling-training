@@ -18,6 +18,9 @@ from app.services.training_plan_service import (
 from app.services.training_state_service import (
     build_training_state_from_activities,
 )
+from app.services.aerobic_response_service import (
+    estimate_aerobic_response_from_activities,
+)
 
 
 def generate_personalized_training_plan(
@@ -51,8 +54,16 @@ def generate_personalized_training_plan(
             ftp=cyclist.ftp,
         )
 
+        aerobic_response = (
+            estimate_aerobic_response_from_activities(
+                activities=activities,
+                reference_date=reference_date,
+            )
+        )
+
         load_decision = decide_next_load(
             training_state=training_state,
+            aerobic_response=aerobic_response,
         )
 
         target_tss = calculate_target_tss(

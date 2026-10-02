@@ -7,7 +7,6 @@ from app.services.training_engine_service import (
     generate_personalized_training_plan,
 )
 
-
 def test_generate_personalized_training_plan():
     cyclist = Cyclist(
         cyclist_id=1,
@@ -141,3 +140,62 @@ def test_generate_personalized_training_plan_with_insufficient_history():
     assert plan is not None
     assert plan.target_tss > 0
     assert len(plan.workouts) == 4
+
+def test_elevated_aerobic_response_reduces_target_tss():
+    cyclist = Cyclist(
+        cyclist_id=1,
+        modalities=[Modality.XCO],
+        level=Level.INTERMEDIATE,
+        ftp=250,
+        weekly_hours=8,
+        available_days=[
+            "TUESDAY",
+            "WEDNESDAY",
+            "FRIDAY",
+            "SUNDAY",
+        ],
+        objective=Objective.PERFORMANCE,
+    )
+
+    activities = [
+        Activity(
+            date=date(2026, 9, 1),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            tss=150,
+            aerobic_decoupling=7.0,
+        ),
+        Activity(
+            date=date(2026, 9, 3),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            tss=150,
+            aerobic_decoupling=8.0,
+        ),
+        Activity(
+            date=date(2026, 9, 7),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            tss=155,
+            aerobic_decoupling=6.0,
+        ),
+        Activity(
+            date=date(2026, 9, 10),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            tss=155,
+        ),
+    ]
+
+    plan = generate_personalized_training_plan(
+        cyclist=cyclist,
+        modality=Modality.XCO,
+        activities=activities,
+        reference_date=date(2026, 9, 16),
+    )
+
+    assert plan.target_tss == 263.5

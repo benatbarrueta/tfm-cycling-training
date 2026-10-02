@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 
+
 @dataclass
 class Activity:
     date: date
@@ -9,3 +10,4 @@ class Activity:
     normalized_power: float
     intensity_factor: float | None = None
     tss: float | None = None
+    aerobic_decoupling: float | None = None
