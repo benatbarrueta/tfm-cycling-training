@@ -622,6 +622,11 @@ def main():
 
         return
 
+    if not args.test_athletes:
+        parser.error(
+            "Indica --test-athletes o utiliza --full-cv."
+        )
+        
     train_rows, test_rows = split_by_athlete(
         rows,
         set(args.test_athletes),
