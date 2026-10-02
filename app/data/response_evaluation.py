@@ -442,6 +442,86 @@ def evaluate_personal_median_baseline(
         predicted,
     )
 
+def cross_validate_fixed_models_by_athlete(
+    rows: list[dict],
+    *,
+    ridge_alpha: float = 1.0,
+    forest_max_depth: int | None = None,
+    forest_min_samples_leaf: int = 20,
+    forest_n_estimators: int = 300,
+) -> list[dict]:
+    """Evalúa modelos fijados dejando fuera un atleta cada vez."""
+    results = []
+
+    for train_fold, validation_fold in build_athlete_folds(
+        rows
+    ):
+        athlete_id = validation_fold[0]["athlete_id"]
+
+        global_median_mae = evaluate_median_baseline(
+            train_fold,
+            validation_fold,
+        )
+
+        personal_median_mae = (
+            evaluate_personal_median_baseline(
+                validation_fold
+            )
+        )
+
+        linear_model = train_response_linear_model(
+            train_fold
+        )
+        linear_mae = evaluate_response_linear_model(
+            linear_model,
+            validation_fold,
+        )
+
+        balanced_model = (
+            train_balanced_response_linear_model(
+                train_fold
+            )
+        )
+        balanced_linear_mae = (
+            evaluate_response_linear_model(
+                balanced_model,
+                validation_fold,
+            )
+        )
+
+        ridge_model = train_response_ridge_model(
+            train_fold,
+            alpha=ridge_alpha,
+        )
+        ridge_mae = evaluate_response_ridge_model(
+            ridge_model,
+            validation_fold,
+        )
+
+        forest_model = train_response_random_forest(
+            train_fold,
+            n_estimators=forest_n_estimators,
+            max_depth=forest_max_depth,
+            min_samples_leaf=forest_min_samples_leaf,
+        )
+        forest_mae = evaluate_response_random_forest(
+            forest_model,
+            validation_fold,
+        )
+
+        results.append({
+            "athlete_id": athlete_id,
+            "n_rows": len(validation_fold),
+            "global_median_mae": global_median_mae,
+            "personal_median_mae": personal_median_mae,
+            "linear_mae": linear_mae,
+            "balanced_linear_mae": balanced_linear_mae,
+            "ridge_mae": ridge_mae,
+            "forest_mae": forest_mae,
+        })
+
+    return results
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
@@ -459,10 +539,18 @@ def main():
     parser.add_argument(
         "--test-athletes",
         nargs="+",
-        required=True,
         help=(
             "Identificadores de atletas reservados "
             "para evaluación."
+        ),
+    )
+
+    parser.add_argument(
+        "--full-cv",
+        action="store_true",
+        help=(
+            "Evalúa configuraciones fijadas dejando fuera "
+            "cada atleta una vez."
         ),
     )
 
@@ -473,6 +561,66 @@ def main():
         newline="",
     ) as file:
         rows = list(csv.DictReader(file))
+
+    if args.full_cv:
+        full_cv_results = (
+            cross_validate_fixed_models_by_athlete(
+                rows,
+                ridge_alpha=1.0,
+                forest_max_depth=None,
+                forest_min_samples_leaf=20,
+            )
+        )
+
+        print(
+            "Evaluación leave-one-athlete-out "
+            "sobre los diez atletas:"
+        )
+
+        for result in full_cv_results:
+            print(
+                f"{result['athlete_id']} "
+                f"({result['n_rows']} filas): "
+                f"mediana global="
+                f"{result['global_median_mae']:.2f}, "
+                f"mediana personal="
+                f"{result['personal_median_mae']:.2f}, "
+                f"lineal={result['linear_mae']:.2f}, "
+                f"lineal equilibrada="
+                f"{result['balanced_linear_mae']:.2f}, "
+                f"Ridge={result['ridge_mae']:.2f}, "
+                f"Random Forest="
+                f"{result['forest_mae']:.2f}"
+            )
+
+        print(
+            "\nMAE medio por atleta:"
+        )
+
+        metrics = (
+            ("Mediana global", "global_median_mae"),
+            ("Mediana personal", "personal_median_mae"),
+            ("Regresión lineal", "linear_mae"),
+            (
+                "Regresión equilibrada",
+                "balanced_linear_mae",
+            ),
+            ("Ridge", "ridge_mae"),
+            ("Random Forest", "forest_mae"),
+        )
+
+        for label, key in metrics:
+            mean_mae = sum(
+                result[key]
+                for result in full_cv_results
+            ) / len(full_cv_results)
+
+            print(
+                f"{label}: {mean_mae:.2f} "
+                "puntos de desacoplamiento"
+            )
+
+        return
 
     train_rows, test_rows = split_by_athlete(
         rows,
@@ -691,7 +839,7 @@ def main():
         f"{personal_median_mae:.2f} "
         "puntos de desacoplamiento"
     )
-    
+
     print(
         f"MAE Ridge: {ridge_mae:.2f} "
         "puntos de desacoplamiento"

@@ -16,6 +16,7 @@ from app.data.response_evaluation import (
     cross_validate_random_forest_configs,
     train_balanced_response_linear_model,
     evaluate_personal_median_baseline,
+    cross_validate_fixed_models_by_athlete,
 )
 
 def make_response_row(
@@ -548,3 +549,29 @@ def test_evaluate_personal_median_baseline():
 def test_evaluate_personal_median_baseline_requires_rows():
     with pytest.raises(ValueError):
         evaluate_personal_median_baseline([])
+
+def test_cross_validate_fixed_models_by_athlete():
+    rows = [
+        make_response_row("athlete-a", 30, 5),
+        make_response_row("athlete-a", 60, 7),
+        make_response_row("athlete-b", 45, 6),
+        make_response_row("athlete-b", 75, 8),
+    ]
+
+    results = cross_validate_fixed_models_by_athlete(
+        rows,
+        ridge_alpha=1.0,
+        forest_min_samples_leaf=1,
+        forest_n_estimators=10,
+    )
+
+    assert len(results) == 2
+
+    for result in results:
+        assert result["n_rows"] == 2
+        assert result["global_median_mae"] >= 0
+        assert result["personal_median_mae"] >= 0
+        assert result["linear_mae"] >= 0
+        assert result["balanced_linear_mae"] >= 0
+        assert result["ridge_mae"] >= 0
+        assert result["forest_mae"] >= 0
