@@ -1367,6 +1367,32 @@ def has_prior_history_span(
         and min(cycling_dates) <= required_start
     )
 
+def build_relative_load_features(
+    session_tss: float,
+    history_features: dict,
+) -> dict[str, float] | None:
+    """Relaciona la carga reciente y la sesión con la carga habitual."""
+    previous_7d_tss = float(
+        history_features["previous_7d_tss"]
+    )
+    previous_28d_tss = float(
+        history_features["previous_28d_tss"]
+    )
+
+    chronic_weekly_tss = previous_28d_tss / 4
+
+    if chronic_weekly_tss <= 0:
+        return None
+
+    return {
+        "acute_chronic_load_ratio": (
+            previous_7d_tss / chronic_weekly_tss
+        ),
+        "session_to_chronic_load_ratio": (
+            session_tss / chronic_weekly_tss
+        ),
+    }
+
 def build_response_dataset_row(
     athlete_id: str,
     rides: list[dict],
@@ -1404,14 +1430,55 @@ def build_response_dataset_row(
     ):
         return None
 
+    relative_load_features = build_relative_load_features(
+        session_features["session_tss"],
+        history_features,
+    )
+
+    if relative_load_features is None:
+        return None
+
     return {
         "athlete_id": athlete_id,
         "activity_date": target_date,
         **session_features,
         **history_features,
+        **relative_load_features,
         "target_aerobic_decoupling": (
             comparison["reported_decoupling"]
         ),
+    }
+
+def summarize_prior_responses(
+    comparisons: list[dict],
+    target_date: str,
+) -> dict | None:
+    """Resume respuestas elegibles anteriores a una actividad."""
+    target_datetime = datetime.strptime(
+        target_date,
+        "%Y/%m/%d %H:%M:%S UTC",
+    )
+
+    previous_values = [
+        float(comparison["reported_decoupling"])
+        for comparison in comparisons
+        if (
+            is_eligible_decoupling_response(comparison)
+            and datetime.strptime(
+                comparison["ride_date"],
+                "%Y/%m/%d %H:%M:%S UTC",
+            ) < target_datetime
+        )
+    ]
+
+    if len(previous_values) < 3:
+        return None
+
+    return {
+        "previous_response_median": median(
+            previous_values
+        ),
+        "previous_response_count": len(previous_values),
     }
 
 def build_athlete_response_rows(
@@ -1436,9 +1503,29 @@ def build_athlete_response_rows(
 
     rows = []
 
-    for comparison in comparisons:
-        matching_rides = rides_by_date.get(
+    ordered_comparisons = sorted(
+        comparisons,
+        key=lambda comparison: datetime.strptime(
             comparison["ride_date"],
+            "%Y/%m/%d %H:%M:%S UTC",
+        ),
+    )
+
+    rows = []
+
+    for comparison in ordered_comparisons:
+        target_date = comparison["ride_date"]
+
+        prior_response = summarize_prior_responses(
+            ordered_comparisons,
+            target_date,
+        )
+
+        if prior_response is None:
+            continue
+
+        matching_rides = rides_by_date.get(
+            target_date,
             [],
         )
 
@@ -1453,7 +1540,10 @@ def build_athlete_response_rows(
         )
 
         if row is not None:
-            rows.append(row)
+            rows.append({
+                **row,
+                **prior_response,
+            })
 
     return rows
 
