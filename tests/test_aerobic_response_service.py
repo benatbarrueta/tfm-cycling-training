@@ -9,6 +9,7 @@ from app.services.aerobic_response_service import (
     classify_aerobic_response,
     estimate_personal_decoupling,
     estimate_aerobic_response_from_activities,
+    estimate_personal_decoupling_from_activities
 )
 
 
@@ -146,3 +147,26 @@ def test_estimate_response_ignores_future_activities():
     )
 
     assert result == AerobicResponse.STABLE
+
+def test_estimate_personal_decoupling_from_activities():
+    activities = [
+        Activity(
+            date=date(2026, 1, day),
+            duration_minutes=60,
+            average_power=180,
+            normalized_power=200,
+            aerobic_decoupling=decoupling,
+        )
+        for day, decoupling in [
+            (1, 4.0),
+            (2, 8.0),
+            (3, 6.0),
+        ]
+    ]
+
+    result = estimate_personal_decoupling_from_activities(
+        activities=activities,
+        reference_date=date(2026, 1, 10),
+    )
+
+    assert result == pytest.approx(6.0)

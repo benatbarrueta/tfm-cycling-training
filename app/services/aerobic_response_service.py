@@ -52,13 +52,13 @@ def classify_aerobic_response(
 
     return AerobicResponse.STABLE
 
-def estimate_aerobic_response_from_activities(
+def estimate_personal_decoupling_from_activities(
     activities: list[Activity],
     reference_date: date,
     *,
     minimum_observations: int = 3,
-) -> AerobicResponse:
-    """Estima la respuesta usando actividades anteriores a la fecha de referencia."""
+) -> float | None:
+    """Estima el desacoplamiento usando las actividades anteriores."""
     previous_decouplings = [
         activity.aerobic_decoupling
         for activity in activities
@@ -66,9 +66,24 @@ def estimate_aerobic_response_from_activities(
         and activity.aerobic_decoupling is not None
     ]
 
-    expected_decoupling = estimate_personal_decoupling(
+    return estimate_personal_decoupling(
         previous_decouplings,
         minimum_observations=minimum_observations,
+    )
+
+def estimate_aerobic_response_from_activities(
+    activities: list[Activity],
+    reference_date: date,
+    *,
+    minimum_observations: int = 3,
+) -> AerobicResponse:
+    """Clasifica la respuesta estimada a partir de actividades anteriores."""
+    expected_decoupling = (
+        estimate_personal_decoupling_from_activities(
+            activities=activities,
+            reference_date=reference_date,
+            minimum_observations=minimum_observations,
+        )
     )
 
     return classify_aerobic_response(
