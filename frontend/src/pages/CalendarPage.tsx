@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   addDays,
   addMonths,
@@ -19,13 +20,17 @@ import {
   CompletedActivityCard,
 } from "../components/CompletedActivityCard";
 import { useActivities } from "../hooks/useActivities";
+import { useSeasonPlan } from "../hooks/useSeasonPlan";
 import { phaseLabels, workoutLabels } from "../lib/labels";
-import { seasonPlanMock } from "../mocks/seasonPlan";
+import { getCurrentDate, getTodayInTimeZone, getWeekLabel, getWeekTemporalState } from "../lib/temporal";
+import { summarizeWeeklyActivities } from "../lib/weeklyActivitySummary";
+import { localDateToUtcIso } from "../lib/timezone";
 import type {
   CalendarDay,
   CalendarView,
 } from "../types/calendar";
 import type { ActivityInput } from "../api/activities";
+import type { PlannedWeek } from "../api/seasonPlans";
 import "../styles/CalendarPage.css";
 
 const statusLabels = {
@@ -85,12 +90,12 @@ function getVisibleDates(
 function getActivityRange(dates: Date[]) {
   const first = dates[0];
   const last = dates[dates.length - 1];
-  const start = new Date(first.getFullYear(), first.getMonth(), first.getDate());
-  const end = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
+  const startDate = format(first, "yyyy-MM-dd");
+  const endDate = format(addDays(last, 1), "yyyy-MM-dd");
 
   return {
-    start: start.toISOString(),
-    end: end.toISOString(),
+    start: localDateToUtcIso(startDate, "Europe/Madrid"),
+    end: localDateToUtcIso(endDate, "Europe/Madrid"),
     limit: 100,
   };
 }
@@ -139,14 +144,20 @@ function getCalendarTitle(
 }
 
 export function CalendarPage() {
-  const seasonPlan = seasonPlanMock;
+  const { plan: seasonPlan, status, error, refresh } = useSeasonPlan();
+  const today = getTodayInTimeZone(getCurrentDate(), "Europe/Madrid");
+  const [searchParams] = useSearchParams();
 
   const [view, setView] =
-    useState<CalendarView>("month");
+    useState<CalendarView>(() =>
+      searchParams.get("view") === "week" ? "week" : "month",
+    );
 
   const [selectedDate, setSelectedDate] =
     useState(() =>
-      new Date(),
+      searchParams.get("date")
+        ? parseISO(searchParams.get("date") ?? today)
+        : getCurrentDate(),
     );
 
   const activityFilters = useMemo(() => {
@@ -170,12 +181,20 @@ export function CalendarPage() {
     "yyyy-MM-dd",
   );
 
-  const selectedWeek =
-    seasonPlan.weeks.find(
+  const selectedWeek: PlannedWeek | null =
+    seasonPlan?.weeks.find(
       (week) =>
         selectedDateText >= week.week_start &&
         selectedDateText <= week.week_end,
     ) ?? null;
+  const calendarWeekStart = format(startOfWeek(selectedDate, { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const calendarWeekEnd = format(endOfWeek(selectedDate, { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const calendarWeekActivities = summarizeWeeklyActivities(
+    activities,
+    calendarWeekStart,
+    calendarWeekEnd,
+    "Europe/Madrid",
+  );
 
   const calendarDays = useMemo<CalendarDay[]>(
     () =>
@@ -186,34 +205,19 @@ export function CalendarPage() {
         );
 
         const plannedWeek =
-          seasonPlan.weeks.find(
+          seasonPlan?.weeks.find(
             (week) =>
               isoDate >= week.week_start &&
               isoDate <= week.week_end,
           ) ?? null;
 
-        const trainingPlan =
-          plannedWeek?.training_plan ?? null;
-
-        const prediction =
-          trainingPlan
-            ?.workout_response_predictions
-            .find(
-              (item) =>
-                item.session_date === isoDate,
-            ) ?? null;
-
         const plannedWorkout =
-          prediction === null
-            ? null
-            : trainingPlan?.workouts.find(
-                (workout) =>
-                  workout.day === prediction.day,
-              ) ?? null;
+          plannedWeek?.workouts.find((workout) => workout.scheduled_date === isoDate) ?? null;
+        const prediction = plannedWorkout;
 
         const dayActivities =
           activities.filter((activity) =>
-            format(new Date(activity.started_at), "yyyy-MM-dd") === isoDate,
+            getTodayInTimeZone(activity.started_at, "Europe/Madrid") === isoDate,
           );
 
         let status: CalendarDay["status"];
@@ -229,7 +233,7 @@ export function CalendarPage() {
         } else if (dayActivities.length > 0) {
           status = "completed";
         } else if (plannedWorkout !== null) {
-          status = isoDate < format(new Date(), "yyyy-MM-dd") ? "missed" : "planned";
+          status = isoDate < today ? "missed" : "planned";
         } else if (
           plannedWeek?.status === "PROVISIONAL"
         ) {
@@ -250,9 +254,13 @@ export function CalendarPage() {
     [
       activities,
       seasonPlan,
+      today,
       visibleDates,
     ],
   );
+
+  if (status === "loading") return <main className="calendar-page"><p>Cargando planificación...</p></main>;
+  if (status === "error") return <main className="calendar-page"><p>{error ?? "No se ha podido cargar la planificación."}</p><button type="button" onClick={() => void refresh()}>Reintentar</button></main>;
 
   function movePeriod(direction: -1 | 1) {
     setSelectedDate((currentDate) => {
@@ -286,7 +294,7 @@ export function CalendarPage() {
   }
 
   function goToToday() {
-    setSelectedDate(new Date());
+    setSelectedDate(parseISO(today));
     setShowActivityForm(false);
   }
 
@@ -317,7 +325,12 @@ export function CalendarPage() {
         onNext={() => movePeriod(1)}
       />
 
-      {selectedWeek !== null && (
+      {seasonPlan === null ? (
+        <section className="calendar-page__week-summary">
+          <p>Aún no tienes un plan de temporada. Las actividades registradas siguen disponibles.</p>
+          <strong>TSS registrado: {calendarWeekActivities.knownTss.toFixed(0)}</strong>
+        </section>
+      ) : selectedWeek !== null ? (
         <section
           className={[
             "calendar-page__week-summary",
@@ -326,14 +339,11 @@ export function CalendarPage() {
         >
           <div>
             <span>
-              {phaseLabels[selectedWeek.phase]}
+              {phaseLabels[selectedWeek.phase as keyof typeof phaseLabels]}
             </span>
 
             <strong>
-              Semana{" "}
-              {weekStatusLabels[
-                selectedWeek.status
-              ].toLowerCase()}
+              {getWeekLabel(selectedWeek.status, getWeekTemporalState(today, selectedWeek.week_start, selectedWeek.week_end))}
             </strong>
           </div>
 
@@ -341,27 +351,17 @@ export function CalendarPage() {
             <div>
               <dt>TSS previsto</dt>
               <dd>
-                {selectedWeek.planned_tss.toFixed(
-                  0,
-                )}
+                {(selectedWeek.adapted_target_tss ?? selectedWeek.estimated_total_tss ?? selectedWeek.provisional_target_tss).toFixed(0)}
               </dd>
             </div>
 
             <div>
-              <dt>TSS realizado</dt>
+              <dt>TSS registrado</dt>
               <dd>
-                {selectedWeek.completed_tss.toFixed(
-                  0,
-                )}
+                {summarizeWeeklyActivities(activities, selectedWeek.week_start, selectedWeek.week_end, "Europe/Madrid").knownTss.toFixed(0)}
               </dd>
             </div>
           </dl>
-
-          {selectedWeek.adaptation_reason && (
-            <p>
-              {selectedWeek.adaptation_reason}
-            </p>
-          )}
 
           {selectedWeek.status ===
             "PROVISIONAL" && (
@@ -370,6 +370,11 @@ export function CalendarPage() {
               cuando esta semana pase a estar activa.
             </p>
           )}
+        </section>
+      ) : (
+        <section className="calendar-page__week-summary">
+          <p>Este intervalo no pertenece a una semana planificada.</p>
+          <strong>TSS registrado: {calendarWeekActivities.knownTss.toFixed(0)}</strong>
         </section>
       )}
 
@@ -408,8 +413,8 @@ export function CalendarPage() {
 
           const isObjectiveDate =
             day.date ===
-            seasonPlan.objective_date;
-          const isToday = day.date === format(new Date(), "yyyy-MM-dd");
+            seasonPlan?.target_date;
+          const isToday = day.date === today;
           const isSelected = day.date === selectedDateText;
 
           const completedDuration =
@@ -494,22 +499,16 @@ export function CalendarPage() {
                     ].join(" ")}
                   >
                     <strong>
-                      {phaseLabels[
-                        plannedWeek.phase
-                      ]}
+                      {phaseLabels[plannedWeek.phase as keyof typeof phaseLabels]}
                     </strong>
 
                     <span>
-                      {plannedWeek.planned_tss.toFixed(
-                        0,
-                      )}{" "}
+                      {(plannedWeek.adapted_target_tss ?? plannedWeek.estimated_total_tss ?? plannedWeek.provisional_target_tss).toFixed(0)}{" "}
                       TSS
                     </span>
 
                     <small>
-                      {weekStatusLabels[
-                        plannedWeek.status
-                      ]}
+                      {weekStatusLabels[plannedWeek.status as keyof typeof weekStatusLabels]}
                     </small>
                   </div>
                 )}
@@ -525,7 +524,7 @@ export function CalendarPage() {
               {workout !== null ? (
                 <div className="calendar-day__workout">
                   <strong>
-                    {workoutLabels[workout.workout_type]}
+                    {workoutLabels[workout.workout_type as keyof typeof workoutLabels]}
                   </strong>
 
                   <span>
@@ -533,18 +532,14 @@ export function CalendarPage() {
                   </span>
 
                   <span>
-                    {workout.estimated_tss?.toFixed(0) ??
-                      "—"}{" "}
+                    {(workout.estimated_tss ?? workout.target_tss).toFixed(0)}{" "}
                     TSS
                   </span>
 
                   {prediction !== null && (
                     <span className="calendar-day__prediction">
                       Respuesta prevista:{" "}
-                      {prediction
-                        .predicted_aerobic_decoupling
-                        .toFixed(1)}
-                      %
+                      {prediction.predicted_aerobic_decoupling?.toFixed(1) ?? "—"}%
                     </span>
                   )}
                 </div>

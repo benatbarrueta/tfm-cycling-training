@@ -21,6 +21,7 @@ import { ProgressPage } from "./pages/ProgressPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { useCyclistProfile } from "./hooks/useCyclistProfile";
 import "./styles/App.css";
+import { SeasonPlanProvider } from "./context/SeasonPlanProvider";
 
 function App() {
   const auth = useAuth();
@@ -81,7 +82,13 @@ function AppRoutes({ auth }: AppRoutesProps) {
           <Route path="/login" element={<AuthPage mode="login" onDemoAccess={auth.loginAsDemo} onGoogleLogin={auth.loginWithGoogle} />} />
           <Route path="/register" element={<AuthPage mode="register" onDemoAccess={auth.loginAsDemo} onGoogleLogin={auth.loginWithGoogle} />} />
         </Route>
-        <Route element={<PrivateRoutes isAuthenticated={auth.isAuthenticated} />}>
+        <Route
+          element={
+            <SeasonPlanProvider>
+              <PrivateRoutes isAuthenticated={auth.isAuthenticated} />
+            </SeasonPlanProvider>
+          }
+        >
           <Route element={<ProfileRequired />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/calendar" element={<CalendarPage />} />

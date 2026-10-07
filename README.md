@@ -163,9 +163,10 @@ python -m alembic upgrade head
 
 Las actividades manuales siempre se guardan con `source=MANUAL`; el cliente
 no puede cambiar el propietario ni el origen. Las importaciones FIT, TCX,
-GoldenCheetah y servicios externos quedan pendientes. Los workouts
-planificados, el plan de temporada y algunas métricas del dashboard siguen
-siendo simulados en esta fase.
+GoldenCheetah y servicios externos quedan pendientes. El plan de temporada,
+los workouts planificados, el dashboard y el calendario consumen la API
+persistida. La vista Evolución conserva gráficas de demostración hasta
+disponer de suficientes semanas completadas y adaptadas.
 
 Se puede indicar otro artefacto mediante:
 

@@ -71,6 +71,11 @@ export function ProgressPage() {
         </p>
       </header>
 
+      <p className="progress-page__demo-notice">
+        Vista de demostración: las gráficas históricas todavía utilizan datos
+        de ejemplo. Las actividades recientes se muestran por separado.
+      </p>
+
       <section className="progress-page__metrics">
         <article>
           <span>Cumplimiento</span>

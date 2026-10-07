@@ -11,7 +11,7 @@ import {
 
 const emptyFilters: ActivityFilters = {};
 
-export function useActivities(filters: ActivityFilters = emptyFilters) {
+export function useActivities(filters: ActivityFilters = emptyFilters, enabled = true) {
   const { end, limit, offset, start } = filters;
   const [activities, setActivities] = useState<Activity[]>([]);
   const [total, setTotal] = useState(0);
@@ -19,6 +19,7 @@ export function useActivities(filters: ActivityFilters = emptyFilters) {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (!enabled) return;
     setStatus("loading");
     try {
       const response = await listActivities({ end, limit, offset, start });
@@ -31,9 +32,12 @@ export function useActivities(filters: ActivityFilters = emptyFilters) {
       setError(message);
       setStatus("error");
     }
-  }, [end, limit, offset, start]);
+  }, [end, enabled, limit, offset, start]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     let active = true;
     listActivities({ end, limit, offset, start })
       .then((response) => {
@@ -51,7 +55,7 @@ export function useActivities(filters: ActivityFilters = emptyFilters) {
     return () => {
       active = false;
     };
-  }, [end, limit, offset, start]);
+  }, [end, enabled, limit, offset, start]);
 
   const addActivity = useCallback(async (input: ActivityInput) => {
     const activity = await createActivity(input);

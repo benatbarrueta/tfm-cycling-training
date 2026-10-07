@@ -1,9 +1,5 @@
 import type { Activity } from "../api/activities";
-import type { Workout, WorkoutResponsePrediction } from "./training";
-
-import type {
-  PlannedWeek,
-} from "./season";
+import type { PlannedWeek, PlannedWorkout } from "../api/seasonPlans";
 
 export type CalendarView =
   | "month"
@@ -21,11 +17,9 @@ export type CalendarDayStatus =
 export interface CalendarDay {
   date: string;
   planned_week: PlannedWeek | null;
-  planned_workout: Workout | null;
+  planned_workout: PlannedWorkout | null;
   activities: ActivityRecord[];
-  response_prediction:
-    | WorkoutResponsePrediction
-    | null;
+  response_prediction: PlannedWorkout | null;
   status: CalendarDayStatus;
 }
 

@@ -21,6 +21,15 @@
   color: #637068;
 }
 
+.progress-page__demo-notice {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid #e2a93b;
+  background: #fff8e8;
+  color: #73551b;
+  font-size: 0.9rem;
+}
+
 .progress-page__eyebrow {
   margin-bottom: 0.4rem !important;
   color: #27734b;
