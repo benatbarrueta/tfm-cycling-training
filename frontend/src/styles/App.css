@@ -1,7 +1,22 @@
 .placeholder-page {
-  width: min(100% - 2rem, 76rem);
+  width: min(100% - 2rem, 78rem);
   margin: 0 auto;
   padding: 4rem 0;
+}
+
+main {
+  min-height: calc(100vh - 4.5rem);
+}
+
+.demo-banner {
+  width: min(100% - 2rem, 78rem);
+  margin: 0.75rem auto 0;
+  padding: 0.65rem 1rem;
+  color: #73511f;
+  background: #fff5df;
+  border-radius: 0.65rem;
+  font-size: 0.82rem;
+  text-align: center;
 }
 
 .placeholder-page__eyebrow {

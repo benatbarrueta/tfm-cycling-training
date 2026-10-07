@@ -2,7 +2,7 @@
   display: grid;
   width: min(100% - 2rem, 76rem);
   margin: 0 auto;
-  padding: 3rem 0;
+  padding: clamp(2rem, 5vw, 4.5rem) 0;
   gap: 1.5rem;
 }
 
@@ -20,6 +20,7 @@
 
 .activities-page__header h1 {
   font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: -0.05em;
 }
 
 .activities-page__header > div:first-child > p:last-child {
@@ -44,6 +45,42 @@
   background: #193d2a;
   color: #ffffff;
   border-radius: 1rem;
+}
+
+.activities-page__add-button {
+  white-space: nowrap;
+}
+
+.activities-page__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.activities-page__summary article {
+  padding: 1rem 1.1rem;
+  background: #e8efe8;
+  border-radius: 0.8rem;
+}
+
+.activities-page__summary strong,
+.activities-page__summary span {
+  display: block;
+}
+
+.activities-page__summary strong {
+  font-size: 1.45rem;
+}
+
+.activities-page__summary span {
+  margin-top: 0.2rem;
+  color: #637068;
+  font-size: 0.78rem;
+}
+
+.activities-page__history-note {
+  color: #637068;
+  font-size: 0.78rem;
 }
 
 .activities-page__counter strong,
@@ -160,5 +197,9 @@
   .activities-page__history > header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .activities-page__summary {
+    grid-template-columns: 1fr;
   }
 }

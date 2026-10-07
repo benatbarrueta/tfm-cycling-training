@@ -5,29 +5,12 @@ import type {
 import type {
   ActivityRecord,
 } from "../types/calendar";
-
-const STORAGE_KEY = "cycling-training-activities";
+import { readMigratedStorage, storageKeys } from "../config/storage";
 
 function loadActivities(): ActivityRecord[] {
-  const savedActivities =
-    localStorage.getItem(STORAGE_KEY);
-
-  if (savedActivities === null) {
-    return [];
-  }
-
-  try {
-    const parsedActivities: unknown =
-      JSON.parse(savedActivities);
-
-    if (!Array.isArray(parsedActivities)) {
-      return [];
-    }
-
-    return parsedActivities as ActivityRecord[];
-  } catch {
-    return [];
-  }
+  return readMigratedStorage("activities", (value) =>
+    Array.isArray(value) ? (value as ActivityRecord[]) : null,
+  ) ?? [];
 }
 
 export function useActivities() {
@@ -37,7 +20,7 @@ export function useActivities() {
 
   useEffect(() => {
     localStorage.setItem(
-      STORAGE_KEY,
+      storageKeys.activities,
       JSON.stringify(activities),
     );
   }, [activities]);

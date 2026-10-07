@@ -11,8 +11,7 @@ import {
   type CyclistFormValues,
 } from "../schemas/cyclistSchema";
 import "../styles/ProfilePage.css";
-
-const STORAGE_KEY = "cycling-training-profile";
+import { readMigratedStorage, storageKeys } from "../config/storage";
 
 const modalityLabels = {
   ROAD: "Carretera",
@@ -58,27 +57,13 @@ function loadProfile(): CyclistFormValues {
     ],
   };
 
-  const savedProfile =
-    localStorage.getItem(STORAGE_KEY);
-
-  if (savedProfile === null) {
-    return defaultProfile;
-  }
-
-  try {
-    const result = cyclistSchema.safeParse(
-      JSON.parse(savedProfile),
-    );
-
-    return result.success
-      ? result.data
-      : defaultProfile;
-  } catch {
-    return defaultProfile;
-  }
+  return readMigratedStorage("profile", (value) => {
+    const result = cyclistSchema.safeParse(value);
+    return result.success ? result.data : null;
+  }) ?? defaultProfile;
 }
 
-export function ProfilePage() {
+export function ProfilePage({ onSaved }: { onSaved?: () => void } = {}) {
   const [saved, setSaved] = useState(false);
 
   const {
@@ -101,11 +86,12 @@ export function ProfilePage() {
     values: CyclistFormValues,
   ) {
     localStorage.setItem(
-      STORAGE_KEY,
+      storageKeys.profile,
       JSON.stringify(values),
     );
 
     setSaved(true);
+    onSaved?.();
   }
 
   return (

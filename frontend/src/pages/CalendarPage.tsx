@@ -19,6 +19,7 @@ import {
   CompletedActivityCard,
 } from "../components/CompletedActivityCard";
 import { useActivities } from "../hooks/useActivities";
+import { phaseLabels, workoutLabels } from "../lib/labels";
 import { seasonPlanMock } from "../mocks/seasonPlan";
 import type {
   CalendarDay,
@@ -34,13 +35,6 @@ const statusLabels = {
   completed: "Completado",
   partial: "Parcial",
   missed: "No realizado",
-} as const;
-
-const phaseLabels = {
-  BASE: "Base",
-  BUILD: "Construcción",
-  PEAK: "Pico",
-  TAPER: "Descarga",
 } as const;
 
 const weekStatusLabels = {
@@ -134,19 +128,12 @@ function getCalendarTitle(
 export function CalendarPage() {
   const seasonPlan = seasonPlanMock;
 
-  const activeWeek = seasonPlan.weeks.find(
-    (week) => week.status === "ACTIVE",
-  );
-
   const [view, setView] =
-    useState<CalendarView>("week");
+    useState<CalendarView>("month");
 
   const [selectedDate, setSelectedDate] =
     useState(() =>
-      parseISO(
-        activeWeek?.week_start ??
-          seasonPlan.start_date,
-      ),
+      new Date(),
     );
 
   const [
@@ -219,10 +206,18 @@ export function CalendarPage() {
 
         let status: CalendarDay["status"];
 
-        if (dayActivities.length > 0) {
+        const completedTss = dayActivities.reduce(
+          (total, activity) => total + (activity.tss ?? 0),
+          0,
+        );
+        const plannedTss = plannedWorkout?.estimated_tss ?? plannedWorkout?.target_tss ?? 0;
+
+        if (dayActivities.length > 0 && plannedTss > 0 && completedTss < plannedTss * 0.8) {
+          status = "partial";
+        } else if (dayActivities.length > 0) {
           status = "completed";
         } else if (plannedWorkout !== null) {
-          status = "planned";
+          status = isoDate < format(new Date(), "yyyy-MM-dd") ? "missed" : "planned";
         } else if (
           plannedWeek?.status === "PROVISIONAL"
         ) {
@@ -405,6 +400,8 @@ export function CalendarPage() {
           const isObjectiveDate =
             day.date ===
             seasonPlan.objective_date;
+          const isToday = day.date === format(new Date(), "yyyy-MM-dd");
+          const isSelected = day.date === selectedDateText;
 
           const completedDuration =
             day.activities.reduce(
@@ -438,6 +435,8 @@ export function CalendarPage() {
                 )
                   ? "calendar-day--outside"
                   : "",
+                isToday ? "calendar-day--today" : "",
+                isSelected ? "calendar-day--selected" : "",
               ].join(" ")}
             >
               <button
@@ -506,10 +505,18 @@ export function CalendarPage() {
                   </div>
                 )}
 
+              {view === "month" && (
+                <div className="calendar-day__mobile-dots" aria-label="Información del día">
+                  {workout !== null && <span className="calendar-day__dot calendar-day__dot--planned" />}
+                  {day.activities.length > 0 && <span className="calendar-day__dot calendar-day__dot--completed" />}
+                  {isObjectiveDate && <span className="calendar-day__dot calendar-day__dot--objective" />}
+                </div>
+              )}
+
               {workout !== null ? (
                 <div className="calendar-day__workout">
                   <strong>
-                    {workout.workout_type}
+                    {workoutLabels[workout.workout_type]}
                   </strong>
 
                   <span>

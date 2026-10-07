@@ -2,6 +2,7 @@ import type {
   Workout,
   WorkoutResponsePrediction,
 } from "../types/training";
+import { dayLabels, responseLabels, workoutLabels } from "../lib/labels";
 
 import "../styles/WorkoutCard.css";
 
@@ -9,24 +10,6 @@ interface WorkoutCardProps {
   workout: Workout;
   prediction?: WorkoutResponsePrediction;
 }
-
-const dayLabels = {
-  MONDAY: "Lunes",
-  TUESDAY: "Martes",
-  WEDNESDAY: "Miércoles",
-  THURSDAY: "Jueves",
-  FRIDAY: "Viernes",
-  SATURDAY: "Sábado",
-  SUNDAY: "Domingo",
-} as const;
-
-const workoutLabels = {
-  RECOVERY: "Recuperación",
-  ENDURANCE: "Resistencia",
-  TEMPO: "Tempo",
-  THRESHOLD: "Umbral",
-  VO2MAX: "VO₂ máx.",
-} as const;
 
 function formatPowerRange(
   minimum: number | null,
@@ -115,7 +98,7 @@ export function WorkoutCard({
       {prediction !== undefined && (
         <footer className="workout-card__footer">
           Respuesta aeróbica prevista:{" "}
-          <strong>{prediction.aerobic_response}</strong>
+          <strong>{responseLabels[prediction.aerobic_response]}</strong>
         </footer>
       )}
     </article>

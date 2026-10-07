@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActivityForm } from "../components/ActivityForm";
-import type { ActivityInput } from "../types/training";
+import { useActivities } from "../hooks/useActivities";
 import "../styles/ActivitiesPage.css";
 
 function formatValue(
@@ -13,27 +13,15 @@ function formatValue(
 }
 
 export function ActivitiesPage() {
-  const [activities, setActivities] = useState<
-    ActivityInput[]
-  >([]);
-
-  function addActivity(activity: ActivityInput) {
-    setActivities((currentActivities) =>
-      [activity, ...currentActivities].sort(
-        (first, second) =>
-          second.date.localeCompare(first.date),
-      ),
-    );
-  }
-
-  function removeActivity(index: number) {
-    setActivities((currentActivities) =>
-      currentActivities.filter(
-        (_, activityIndex) =>
-          activityIndex !== index,
-      ),
-    );
-  }
+  const { activities, addActivity, removeActivity } = useActivities();
+  const [showForm, setShowForm] = useState(false);
+  const totalTss = activities.reduce((total, activity) => total + (activity.tss ?? 0), 0);
+  const decouplings = activities
+    .map((activity) => activity.aerobic_decoupling)
+    .filter((value): value is number => value !== null);
+  const averageDecoupling = decouplings.length > 0
+    ? decouplings.reduce((total, value) => total + value, 0) / decouplings.length
+    : null;
 
   return (
     <main className="activities-page">
@@ -51,13 +39,29 @@ export function ActivitiesPage() {
           </p>
         </div>
 
-        <div className="activities-page__counter">
-          <strong>{activities.length}</strong>
-          <span>actividades registradas</span>
-        </div>
+        <button
+          className="button button--primary activities-page__add-button"
+          type="button"
+          onClick={() => setShowForm((visible) => !visible)}
+        >
+          {showForm ? "Cerrar formulario" : "＋ Añadir actividad"}
+        </button>
       </header>
 
-      <ActivityForm onSubmit={addActivity} />
+      <section className="activities-page__summary" aria-label="Resumen del historial">
+        <article><strong>{activities.length}</strong><span>actividades</span></article>
+        <article><strong>{totalTss.toFixed(0)}</strong><span>TSS acumulado</span></article>
+        <article><strong>{averageDecoupling === null ? "—" : `${averageDecoupling.toFixed(1)}%`}</strong><span>desacoplamiento medio</span></article>
+      </section>
+
+      {showForm && (
+        <ActivityForm
+          onSubmit={(activity) => {
+            addActivity(activity);
+            setShowForm(false);
+          }}
+        />
+      )}
 
       <section className="activities-page__history">
         <header>
@@ -69,9 +73,9 @@ export function ActivitiesPage() {
             </p>
           </div>
 
-          <button type="button">
-            Importar archivo
-          </button>
+          <span className="activities-page__history-note">
+            Tus sesiones se guardan en este dispositivo
+          </span>
         </header>
 
         {activities.length === 0 ? (
@@ -102,9 +106,9 @@ export function ActivitiesPage() {
               </thead>
 
               <tbody>
-                {activities.map((activity, index) => (
+                {activities.map((activity) => (
                   <tr
-                    key={`${activity.date}-${index}`}
+                    key={activity.id}
                   >
                     <td>{activity.date}</td>
 
@@ -143,9 +147,7 @@ export function ActivitiesPage() {
                       <button
                         className="activities-page__delete"
                         type="button"
-                        onClick={() =>
-                          removeActivity(index)
-                        }
+                        onClick={() => removeActivity(activity.id)}
                       >
                         Eliminar
                       </button>

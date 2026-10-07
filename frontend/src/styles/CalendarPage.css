@@ -155,6 +155,25 @@
   opacity: 0.35;
 }
 
+.calendar-day--today {
+  box-shadow: none;
+}
+
+.calendar-page__grid--month .calendar-day--today .calendar-day__date span,
+.calendar-page__grid--week .calendar-day--today .calendar-day__date span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  color: #ffffff;
+  background: #1d4a34;
+  border-radius: 50%;
+}
+
+.calendar-day__mobile-dots {
+  display: none;
+}
+
 .calendar-day__date {
   display: flex;
   width: 100%;
@@ -428,23 +447,82 @@
   }
 
   .calendar-page__grid--month {
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
-    grid-auto-rows: 10rem;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.15rem;
+    grid-auto-rows: 4.1rem;
   }
 
   .calendar-page__grid--month
     .calendar-day--outside {
+    opacity: 0.28;
+  }
+
+  .calendar-page__grid--month .calendar-day {
+    padding: 0.25rem 0.1rem;
+    border-radius: 0.45rem;
+  }
+
+  .calendar-page__grid--month .calendar-day__date {
+    justify-content: center;
+  }
+
+  .calendar-page__grid--month .calendar-day__date span {
+    display: grid;
+    width: 1.4rem;
+    height: 1.4rem;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 0.7rem;
+  }
+
+  .calendar-page__grid--month .calendar-day--today .calendar-day__date span {
+    color: #fff;
+    background: #1d4a34;
+  }
+
+  .calendar-page__grid--month .calendar-day__date small,
+  .calendar-page__grid--month .calendar-day__week-plan,
+  .calendar-page__grid--month .calendar-day__workout,
+  .calendar-page__grid--month .calendar-day__rest,
+  .calendar-page__grid--month .calendar-day__completed,
+  .calendar-page__grid--month .calendar-day__objective,
+  .calendar-page__grid--month .calendar-day__add {
     display: none;
   }
 
+  .calendar-page__grid--month .calendar-day__mobile-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.12rem;
+    margin-top: 0.35rem;
+  }
+
+  .calendar-page__grid--month .calendar-day__dot {
+    width: 0.28rem;
+    height: 0.28rem;
+    border-radius: 50%;
+  }
+
+  .calendar-page__grid--month .calendar-day__dot--planned {
+    background: #3182ce;
+  }
+
+  .calendar-page__grid--month .calendar-day__dot--completed {
+    background: #38a169;
+  }
+
+  .calendar-page__grid--month .calendar-day__dot--objective {
+    background: #b83280;
+  }
+
   .calendar-page__weekdays {
-    display: none;
+    display: grid;
+    font-size: 0.62rem;
   }
 }
 
 @media (max-width: 420px) {
   .calendar-page__grid--month {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 }

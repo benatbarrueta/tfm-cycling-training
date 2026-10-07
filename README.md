@@ -1,7 +1,7 @@
-# TFM — Cycling Training
+# Veloform — TFM de planificación ciclista adaptativa
 
-Sistema híbrido que estima la respuesta aeróbica del ciclista y adapta un
-generador determinista de planes de entrenamiento.
+Veloform es un sistema híbrido que estima la respuesta aeróbica del ciclista y
+adapta un generador determinista de planes de entrenamiento.
 
 El proyecto combina:
 

@@ -2,20 +2,9 @@ import { addDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Link } from "react-router-dom";
 import { useActivities } from "../hooks/useActivities";
+import { dayLabels, decisionLabels, responseLabels, workoutLabels } from "../lib/labels";
 import { trainingPlanMock } from "../mocks/trainingPlan";
 import "../styles/DashboardPage.css";
-
-const decisionLabels = {
-  INCREASE: "Aumentar carga",
-  MAINTAIN: "Mantener carga",
-  REDUCE: "Reducir carga",
-} as const;
-
-const responseLabels = {
-  UNKNOWN: "Sin datos suficientes",
-  STABLE: "Respuesta estable",
-  ELEVATED: "Respuesta elevada",
-} as const;
 
 export function DashboardPage() {
   const { activities } = useActivities();
@@ -203,13 +192,13 @@ export function DashboardPage() {
           ) : (
             <>
               <h2>
-                {nextWorkout.workout_type}
+                {workoutLabels[nextWorkout.workout_type]}
               </h2>
 
               <dl>
                 <div>
                   <dt>Día</dt>
-                  <dd>{nextWorkout.day}</dd>
+                  <dd>{dayLabels[nextWorkout.day]}</dd>
                 </div>
 
                 <div>
