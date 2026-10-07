@@ -1,216 +1,87 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import {
-  activitySchema,
-  type ActivityFormInput,
-  type ActivityFormValues,
-} from "../schemas/activitySchema";
-import type { ActivityInput } from "../types/training";
+import { activitySchema, type ActivityFormInput, type ActivityFormValues } from "../schemas/activitySchema";
+import type { ActivityInput } from "../api/activities";
 import "../styles/ActivityForm.css";
 
 interface ActivityFormProps {
-  initialDate?: string;
-  onSubmit: (activity: ActivityInput) => void;
+  initialValues?: Partial<ActivityFormValues>;
+  onSubmit: (activity: ActivityInput) => Promise<void>;
+  onCancel?: () => void;
+  submitLabel?: string;
 }
 
-export function ActivityForm({
-  initialDate = "",
-  onSubmit,
-}: ActivityFormProps) {
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: {
-      errors,
-      isSubmitting,
-    },
-  } = useForm<
-    ActivityFormInput,
-    unknown,
-    ActivityFormValues
-  >({
+function toIso(value: string): string {
+  return new Date(value).toISOString();
+}
+
+function valueOrNull(value: number | null): number | null {
+  return value === null || Number.isNaN(value) ? null : value;
+}
+
+export function ActivityForm({ initialValues, onSubmit, onCancel, submitLabel = "Guardar actividad" }: ActivityFormProps) {
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ActivityFormInput, unknown, ActivityFormValues>({
     resolver: zodResolver(activitySchema),
     defaultValues: {
-      date: initialDate,
-      duration_minutes: "",
-      average_power: "",
-      normalized_power: "",
-      intensity_factor: "",
-      tss: "",
-      aerobic_decoupling: "",
+      title: initialValues?.title ?? "",
+      started_at: initialValues?.started_at ?? "",
+      duration_minutes: initialValues?.duration_minutes ?? "",
+      distance_km: initialValues?.distance_km ?? "",
+      average_power: initialValues?.average_power ?? "",
+      normalized_power: initialValues?.normalized_power ?? "",
+      average_heart_rate: initialValues?.average_heart_rate ?? "",
+      intensity_factor: initialValues?.intensity_factor ?? "",
+      tss: initialValues?.tss ?? "",
+      aerobic_decoupling: initialValues?.aerobic_decoupling ?? "",
+      notes: initialValues?.notes ?? "",
     },
   });
 
-  function submitActivity(
-  values: ActivityFormValues,
-) {
-  onSubmit(values);
+  async function submit(values: ActivityFormValues) {
+    await onSubmit({
+      title: values.title,
+      started_at: toIso(values.started_at),
+      sport: "CYCLING",
+      duration_minutes: values.duration_minutes,
+      distance_km: valueOrNull(values.distance_km),
+      average_power: valueOrNull(values.average_power),
+      normalized_power: valueOrNull(values.normalized_power),
+      average_heart_rate: valueOrNull(values.average_heart_rate),
+      intensity_factor: valueOrNull(values.intensity_factor),
+      tss: valueOrNull(values.tss),
+      aerobic_decoupling: valueOrNull(values.aerobic_decoupling),
+      notes: values.notes?.trim() || null,
+    });
+  }
 
-  reset({
-    date: initialDate,
-    duration_minutes: "",
-    average_power: "",
-    normalized_power: "",
-    intensity_factor: "",
-    tss: "",
-    aerobic_decoupling: "",
-  });
-}
+  const fields = [
+    ["distance_km", "Distancia (km)", "number"],
+    ["average_power", "Potencia media (W)", "number"],
+    ["normalized_power", "Potencia normalizada (W)", "number"],
+    ["average_heart_rate", "FC media (ppm)", "number"],
+    ["intensity_factor", "Factor de intensidad", "number"],
+    ["tss", "TSS", "number"],
+    ["aerobic_decoupling", "Desacoplamiento (%)", "number"],
+  ] as const;
 
   return (
-    <form
-      className="activity-form"
-      onSubmit={handleSubmit(submitActivity)}
-    >
+    <form className="activity-form" onSubmit={handleSubmit(submit)}>
       <header className="activity-form__header">
-        <div>
-          <p className="activity-form__eyebrow">
-            Registro manual
-          </p>
-
-          <h2>Añadir actividad</h2>
-        </div>
-
-        <p>
-          Introduce los datos disponibles. No todos los
-          campos son obligatorios.
-        </p>
+        <div><p className="activity-form__eyebrow">Registro manual</p><h2>{submitLabel}</h2></div>
+        <p>Introduce solo los datos que conozcas.</p>
       </header>
-
       <div className="activity-form__grid">
-        <label className="activity-form__field">
-          <span>Fecha</span>
-
-          <input
-            type="date"
-            {...register("date")}
-          />
-
-          {errors.date?.message && (
-            <small>{errors.date.message}</small>
-          )}
-        </label>
-
-        <label className="activity-form__field">
-          <span>Duración (minutos)</span>
-
-          <input
-            type="number"
-            min="0"
-            step="1"
-            placeholder="90"
-            {...register("duration_minutes")}
-          />
-
-          {errors.duration_minutes?.message && (
-            <small>
-              {errors.duration_minutes.message}
-            </small>
-          )}
-        </label>
-
-        <label className="activity-form__field">
-          <span>Potencia media (W)</span>
-
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            placeholder="180"
-            {...register("average_power")}
-          />
-
-          {errors.average_power?.message && (
-            <small>
-              {errors.average_power.message}
-            </small>
-          )}
-        </label>
-
-        <label className="activity-form__field">
-          <span>Potencia normalizada (W)</span>
-
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            placeholder="200"
-            {...register("normalized_power")}
-          />
-
-          {errors.normalized_power?.message && (
-            <small>
-              {errors.normalized_power.message}
-            </small>
-          )}
-        </label>
-
-        <label className="activity-form__field">
-          <span>Factor de intensidad</span>
-
-          <input
-            type="number"
-            min="0"
-            max="2"
-            step="0.01"
-            placeholder="0.80"
-            {...register("intensity_factor")}
-          />
-
-          {errors.intensity_factor?.message && (
-            <small>
-              {errors.intensity_factor.message}
-            </small>
-          )}
-        </label>
-
-        <label className="activity-form__field">
-          <span>TSS</span>
-
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            placeholder="64"
-            {...register("tss")}
-          />
-
-          {errors.tss?.message && (
-            <small>{errors.tss.message}</small>
-          )}
-        </label>
-
-        <label className="activity-form__field">
-          <span>Desacoplamiento aeróbico (%)</span>
-
-          <input
-            type="number"
-            step="0.1"
-            placeholder="4.5"
-            {...register("aerobic_decoupling")}
-          />
-
-          {errors.aerobic_decoupling?.message && (
-            <small>
-              {errors.aerobic_decoupling.message}
-            </small>
-          )}
-        </label>
+        <label className="activity-form__field"><span>Título *</span><input {...register("title")} placeholder="Salida de resistencia" />{errors.title && <small>{errors.title.message}</small>}</label>
+        <label className="activity-form__field"><span>Fecha y hora *</span><input type="datetime-local" {...register("started_at")} />{errors.started_at && <small>{errors.started_at.message}</small>}</label>
+        <label className="activity-form__field"><span>Duración (minutos) *</span><input type="number" min="0.1" step="0.1" {...register("duration_minutes")} />{errors.duration_minutes && <small>{errors.duration_minutes.message}</small>}</label>
+        {fields.map(([name, label, type]) => (
+          <label className="activity-form__field" key={name}><span>{label}</span><input type={type} step="0.1" min={name === "aerobic_decoupling" ? undefined : "0"} {...register(name)} />{errors[name] && <small>{errors[name]?.message}</small>}</label>
+        ))}
+        <label className="activity-form__field activity-form__field--full"><span>Notas</span><textarea {...register("notes")} rows={3} /></label>
       </div>
-
       <footer className="activity-form__actions">
-        <p>
-          Debes introducir el TSS o la combinación de
-          duración y factor de intensidad.
-        </p>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-        >
-          Añadir actividad
-        </button>
+        {onCancel && <button type="button" onClick={onCancel}>Cancelar</button>}
+        <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Guardando…" : submitLabel}</button>
       </footer>
     </form>
   );

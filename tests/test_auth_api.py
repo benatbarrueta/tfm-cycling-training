@@ -16,7 +16,7 @@ from app.auth.google import GoogleIdentity
 from app.auth.sessions import hash_token, utc_now
 from app.core.config import Settings, get_settings
 from app.database.base import Base
-from app.database.models import CyclistProfile, UserSession
+from app.database.models import ActivityRecord, CyclistProfile, UserSession
 from app.database.session import get_db
 from app.main import app
 from app.api.routes import auth
@@ -76,6 +76,7 @@ def setup_function():
     with TestingSession() as db:
         db.query(UserSession).delete()
         db.query(CyclistProfile).delete()
+        db.query(ActivityRecord).delete()
         for table in reversed(Base.metadata.sorted_tables):
             if table.name == "users":
                 db.execute(table.delete())
@@ -186,3 +187,57 @@ def test_profile_validates_domain_and_race_date():
     base["target_date"] = "2030-06-01"
     base["timezone"] = "not/a/timezone"
     assert client.put("/api/profile", json=base).status_code == 422
+
+
+def test_activity_crud_is_scoped_to_authenticated_user_and_normalizes_time():
+    assert client.get("/api/activities").status_code == 401
+    client.post("/api/auth/demo")
+    payload = {
+        "title": "Salida larga",
+        "started_at": "2026-10-07T17:30:00+02:00",
+        "duration_minutes": 120,
+        "distance_km": 55,
+        "average_power": 180,
+        "normalized_power": 195,
+        "average_heart_rate": 145,
+        "intensity_factor": 0.78,
+        "tss": 72,
+        "aerobic_decoupling": -1.2,
+        "notes": "Buen ritmo",
+    }
+    response = client.post("/api/activities", json=payload)
+    assert response.status_code == 201
+    activity_id = response.json()["id"]
+    assert response.json()["source"] == "MANUAL"
+    assert response.json()["started_at"].startswith("2026-10-07T15:30:00")
+
+    second = {**payload, "title": "Rodaje corto", "started_at": "2026-10-07T20:00:00+02:00", "duration_minutes": 30}
+    assert client.post("/api/activities", json=second).status_code == 201
+    listed = client.get("/api/activities?limit=1&offset=0")
+    assert listed.json()["total"] == 2
+    assert len(listed.json()["items"]) == 1
+    assert client.get(f"/api/activities/{activity_id}").status_code == 200
+    created_at = response.json()["created_at"]
+
+    updated = {**payload, "title": "Salida actualizada"}
+    update_response = client.put(f"/api/activities/{activity_id}", json=updated)
+    assert update_response.status_code == 200
+    assert update_response.json()["title"] == "Salida actualizada"
+    assert update_response.json()["created_at"] == created_at
+    assert client.delete(f"/api/activities/{activity_id}").status_code == 204
+    assert client.get(f"/api/activities/{activity_id}").status_code == 404
+
+
+def test_activity_validation_and_owner_isolation():
+    client.post("/api/auth/demo")
+    invalid = {
+        "title": " ",
+        "started_at": "2026-10-07T17:30:00",
+        "duration_minutes": -1,
+        "tss": -2,
+    }
+    assert client.post("/api/activities", json=invalid).status_code == 422
+    client.cookies.clear()
+    other = client.post("/api/auth/google", json={"credential": "valid"})
+    assert other.status_code == 200
+    assert client.get("/api/activities").json()["total"] == 0

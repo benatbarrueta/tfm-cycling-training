@@ -215,7 +215,7 @@ export function ProgressPage() {
               )
               .map((activity) => (
                 <article key={activity.id}>
-                  <span>{activity.date}</span>
+                  <span>{new Date(activity.started_at).toLocaleDateString("es-ES")}</span>
                   <strong>
                     {activity.aerobic_decoupling
                       ?.toFixed(1)}

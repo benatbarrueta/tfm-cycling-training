@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, JSON, String, Uuid
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -64,3 +64,31 @@ class CyclistProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     user: Mapped[User] = relationship(back_populates="cyclist_profile")
+
+
+class ActivityRecord(Base):
+    __tablename__ = "activities"
+    __table_args__ = (
+        Index("ix_activities_user_started_at", "user_id", "started_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    sport: Mapped[str] = mapped_column(String(32), nullable=False)
+    duration_minutes: Mapped[float] = mapped_column(Float, nullable=False)
+    distance_km: Mapped[float | None] = mapped_column(Float)
+    average_power: Mapped[float | None] = mapped_column(Float)
+    normalized_power: Mapped[float | None] = mapped_column(Float)
+    average_heart_rate: Mapped[float | None] = mapped_column(Float)
+    intensity_factor: Mapped[float | None] = mapped_column(Float)
+    tss: Mapped[float | None] = mapped_column(Float)
+    aerobic_decoupling: Mapped[float | None] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    external_source_id: Mapped[str | None] = mapped_column(String(255))
+    notes: Mapped[str | None] = mapped_column(String(4000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

@@ -26,8 +26,8 @@ export function DashboardPage() {
 
   const weeklyActivities = activities.filter(
     (activity) =>
-      activity.date >= weekStartText &&
-      activity.date <= weekEndText,
+      activity.started_at.slice(0, 10) >= weekStartText &&
+      activity.started_at.slice(0, 10) <= weekEndText,
   );
 
   const completedTss = weeklyActivities.reduce(

@@ -1,8 +1,5 @@
-import type {
-  ActivityInput,
-  Workout,
-  WorkoutResponsePrediction,
-} from "./training";
+import type { Activity } from "../api/activities";
+import type { Workout, WorkoutResponsePrediction } from "./training";
 
 import type {
   PlannedWeek,
@@ -32,6 +29,4 @@ export interface CalendarDay {
   status: CalendarDayStatus;
 }
 
-export interface ActivityRecord extends ActivityInput {
-  id: string;
-}
+export type ActivityRecord = Activity;

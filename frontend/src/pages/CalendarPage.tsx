@@ -25,7 +25,7 @@ import type {
   CalendarDay,
   CalendarView,
 } from "../types/calendar";
-import type { ActivityInput } from "../types/training";
+import type { ActivityInput } from "../api/activities";
 import "../styles/CalendarPage.css";
 
 const statusLabels = {
@@ -82,6 +82,19 @@ function getVisibleDates(
   });
 }
 
+function getActivityRange(dates: Date[]) {
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  const start = new Date(first.getFullYear(), first.getMonth(), first.getDate());
+  const end = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    limit: 100,
+  };
+}
+
 function getCalendarTitle(
   selectedDate: Date,
   view: CalendarView,
@@ -136,16 +149,16 @@ export function CalendarPage() {
       new Date(),
     );
 
+  const activityFilters = useMemo(() => {
+    return getActivityRange(getVisibleDates(selectedDate, view));
+  }, [selectedDate, view]);
+
   const [
     showActivityForm,
     setShowActivityForm,
   ] = useState(false);
 
-  const {
-    activities,
-    addActivity,
-    removeActivity,
-  } = useActivities();
+  const { activities, addActivity, removeActivity } = useActivities(activityFilters);
 
   const visibleDates = useMemo(
     () => getVisibleDates(selectedDate, view),
@@ -199,9 +212,8 @@ export function CalendarPage() {
               ) ?? null;
 
         const dayActivities =
-          activities.filter(
-            (activity) =>
-              activity.date === isoDate,
+          activities.filter((activity) =>
+            format(new Date(activity.started_at), "yyyy-MM-dd") === isoDate,
           );
 
         let status: CalendarDay["status"];
@@ -285,11 +297,8 @@ export function CalendarPage() {
     setShowActivityForm(false);
   }
 
-  function submitActivity(
-    activity: ActivityInput,
-  ) {
-    addActivity(activity);
-    setSelectedDate(parseISO(activity.date));
+  async function submitActivity(activity: ActivityInput) {
+    await addActivity(activity);
     setView("day");
     setShowActivityForm(false);
   }
@@ -557,20 +566,28 @@ export function CalendarPage() {
               {day.activities.length > 0 && (
                 <div className="calendar-day__completed">
                   <strong>
-                    Actividad completada
+                    {day.activities.length === 1
+                      ? "Actividad realizada"
+                      : `${day.activities.length} actividades realizadas`}
                   </strong>
 
-                  <span>
-                    {completedDuration} min ·{" "}
-                    {completedTss.toFixed(1)} TSS
-                  </span>
-
-                  {day.activities.length > 1 && (
+                  {view !== "day" && (
                     <span>
-                      {day.activities.length}{" "}
-                      actividades
+                      {completedDuration} min ·{" "}
+                      {completedTss.toFixed(1)} TSS
                     </span>
                   )}
+
+                  {view === "day" &&
+                    day.activities.map((activity) => (
+                      <span key={activity.id}>
+                        {activity.title} ·{" "}
+                        {activity.duration_minutes} min
+                        {activity.tss !== null
+                          ? ` · ${activity.tss.toFixed(0)} TSS`
+                          : ""}
+                      </span>
+                    ))}
                 </div>
               )}
 
@@ -616,10 +633,6 @@ export function CalendarPage() {
       {view === "day" &&
         showActivityForm && (
           <ActivityForm
-            initialDate={format(
-              selectedDate,
-              "yyyy-MM-dd",
-            )}
             onSubmit={submitActivity}
           />
         )}

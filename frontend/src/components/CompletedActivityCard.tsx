@@ -5,7 +5,7 @@ import "../styles/CompletedActivityCard.css";
 
 interface CompletedActivityCardProps {
   activity: ActivityRecord;
-  onRemove: (activityId: string) => void;
+  onRemove: (activityId: string) => Promise<void>;
 }
 
 function showMetric(
@@ -26,7 +26,7 @@ export function CompletedActivityCard({
       <header className="completed-activity__header">
         <div>
           <span>Actividad realizada</span>
-          <strong>{activity.date}</strong>
+          <strong>{new Date(activity.started_at).toLocaleString("es-ES")}</strong>
         </div>
 
         <button
@@ -43,10 +43,7 @@ export function CompletedActivityCard({
         <div>
           <dt>Duración</dt>
           <dd>
-            {showMetric(
-              activity.duration_minutes,
-              " min",
-            )}
+            {showMetric(activity.duration_minutes, " min")}
           </dd>
         </div>
 
@@ -87,6 +84,7 @@ export function CompletedActivityCard({
           </dd>
         </div>
       </dl>
+      <strong>{activity.title}</strong>
     </article>
   );
 }

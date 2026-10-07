@@ -169,12 +169,50 @@
   text-transform: uppercase;
 }
 
+.activities-page__activity-title,
+.activities-page__activity-source {
+  display: block;
+}
+
+.activities-page__activity-source {
+  margin-top: 0.25rem;
+  color: #637068;
+  font-size: 0.72rem;
+}
+
+.activities-page__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.activities-page__edit,
 .activities-page__delete {
-  color: #9a382b;
-  background: transparent;
-  border: 0;
+  min-height: 2.2rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.55rem;
   cursor: pointer;
   font-weight: 700;
+}
+
+.activities-page__edit {
+  color: #245c3d;
+  background: #edf6f0;
+  border: 1px solid #bcd8c6;
+}
+
+.activities-page__edit:hover {
+  background: #dcefe2;
+}
+
+.activities-page__delete {
+  color: #9a382b;
+  background: #fff5f2;
+  border: 1px solid #e5bdb6;
+}
+
+.activities-page__delete:hover {
+  background: #fbe5e1;
 }
 
 .visually-hidden {

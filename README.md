@@ -137,6 +137,36 @@ se recupera con `GET /api/profile`. Antes de utilizar las rutas del dashboard,
 un usuario autenticado sin perfil es dirigido a `/onboarding`; la fecha de
 objetivo solo es obligatoria para el objetivo `RACE`.
 
+### Actividades realizadas
+
+Las actividades representan sesiones que el ciclista ha realizado y se
+mantienen separadas de los `Workout`, que son sesiones planificadas. Cada
+actividad pertenece al usuario autenticado y se gestiona mediante:
+
+- `GET /api/activities` con `start`, `end`, `limit` y `offset`.
+- `POST /api/activities` para registrar una actividad manual.
+- `GET /api/activities/{id}` para consultar el detalle.
+- `PUT /api/activities/{id}` para editarla.
+- `DELETE /api/activities/{id}` para eliminarla.
+
+Son obligatorios el título, `started_at` con zona horaria y la duración.
+Las métricas restantes son opcionales. El backend normaliza `started_at` a
+UTC y devuelve ISO 8601; el formulario web convierte correctamente el valor
+`datetime-local` del navegador antes de enviarlo. La API limita las listas a
+100 elementos y ordena las actividades de más reciente a más antigua.
+
+La tabla `activities` se crea con:
+
+```bash
+python -m alembic upgrade head
+```
+
+Las actividades manuales siempre se guardan con `source=MANUAL`; el cliente
+no puede cambiar el propietario ni el origen. Las importaciones FIT, TCX,
+GoldenCheetah y servicios externos quedan pendientes. Los workouts
+planificados, el plan de temporada y algunas métricas del dashboard siguen
+siendo simulados en esta fase.
+
 Se puede indicar otro artefacto mediante:
 
 ```bash
