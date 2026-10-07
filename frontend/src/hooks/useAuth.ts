@@ -1,99 +1,74 @@
 import { useCallback, useEffect, useState } from "react";
-import { storageKeys } from "../config/storage";
-import { demoAuthSession } from "../mocks/auth";
+import {
+  getCurrentUser,
+  loginAsDemo,
+  loginWithGoogle,
+  logout as logoutRequest,
+} from "../api/auth";
+import type { ApiError } from "../api/client";
+import type { AuthenticatedUser } from "../api/types";
 
-export type AuthStatus = "authenticated";
-export type AuthMode = "demo";
+export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl: string | null;
-}
-
-export interface AuthSession {
+interface AuthState {
+  user: AuthenticatedUser | null;
   status: AuthStatus;
-  mode: AuthMode;
-  user: AuthUser;
-}
-
-function parseDemoSession(value: unknown): AuthSession | null {
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "status" in value &&
-    "mode" in value &&
-    "user" in value &&
-    value.status === "authenticated" &&
-    value.mode === "demo" &&
-    typeof value.user === "object" &&
-    value.user !== null &&
-    "id" in value.user &&
-    "name" in value.user &&
-    "email" in value.user &&
-    typeof value.user.id === "string" &&
-    typeof value.user.name === "string" &&
-    typeof value.user.email === "string"
-  ) {
-    return {
-      status: "authenticated",
-      mode: "demo",
-      user: {
-        id: value.user.id,
-        name: value.user.name,
-        email: value.user.email,
-        avatarUrl: null,
-      },
-    };
-  }
-
-  return null;
-}
-
-function readSession(key: string): AuthSession | null {
-  const saved = localStorage.getItem(key);
-  if (saved === null) return null;
-
-  try {
-    return parseDemoSession(JSON.parse(saved));
-  } catch {
-    localStorage.removeItem(key);
-    return null;
-  }
-}
-
-function loadSession(): AuthSession | null {
-  return readSession(storageKeys.demoSession) ?? readSession(storageKeys.session);
+  error: string | null;
 }
 
 export function useAuth() {
-  const [session, setSession] = useState<AuthSession | null>(loadSession);
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    status: "loading",
+    error: null,
+  });
 
   useEffect(() => {
-    if (session === null) {
-      localStorage.removeItem(storageKeys.demoSession);
-      localStorage.removeItem(storageKeys.session);
-    } else {
-      localStorage.setItem(storageKeys.demoSession, JSON.stringify(session));
-      localStorage.removeItem(storageKeys.session);
-    }
-  }, [session]);
+    let active = true;
 
-  const signInDemo = useCallback(() => {
-    setSession(demoAuthSession);
+    getCurrentUser()
+      .then((user) => {
+        if (active) setState({ user, status: "authenticated", error: null });
+      })
+      .catch((error: ApiError) => {
+        if (!active) return;
+        if (error.status === 401) {
+          setState({ user: null, status: "unauthenticated", error: null });
+        } else {
+          setState({
+            user: null,
+            status: "unauthenticated",
+            error: error.message,
+          });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const signOut = useCallback(() => {
-    setSession(null);
+  const loginWithGoogleUser = useCallback(async (credential: string) => {
+    const user = await loginWithGoogle(credential);
+    setState({ user, status: "authenticated", error: null });
+  }, []);
+
+  const loginAsDemoUser = useCallback(async () => {
+    const user = await loginAsDemo();
+    setState({ user, status: "authenticated", error: null });
+  }, []);
+
+  const logout = useCallback(async () => {
+    await logoutRequest();
+    setState({ user: null, status: "unauthenticated", error: null });
   }, []);
 
   return {
-    session,
-    user: session?.user ?? null,
-    isAuthenticated: session !== null,
-    isDemo: session?.mode === "demo",
-    signInDemo,
-    signOut,
+    ...state,
+    isAuthenticated: state.status === "authenticated",
+    loginWithGoogle: loginWithGoogleUser,
+    loginAsDemo: loginAsDemoUser,
+    logout,
+    clearError: () => setState((current) => ({ ...current, error: null })),
   };
 }

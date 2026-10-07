@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import type { AuthUser } from "../hooks/useAuth";
+import type { AuthenticatedUser } from "../api/types";
 import appIcon from "../assets/favicon.ico";
 import "../styles/AppHeader.css";
 
@@ -13,14 +13,14 @@ const navigationItems = [
 ];
 
 interface AppHeaderProps {
-  user: AuthUser | null;
-  isDemo: boolean;
-  onSignOut: () => void;
+  user: AuthenticatedUser | null;
+  onSignOut: () => Promise<void>;
+  signingOut: boolean;
 }
 
-export function AppHeader({ user, isDemo, onSignOut }: AppHeaderProps) {
+export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const initials = user?.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() ?? "VF";
+  const initials = user?.display_name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() ?? "VF";
   return (
     <header className="app-header">
       <div className="app-header__content">
@@ -81,12 +81,12 @@ export function AppHeader({ user, isDemo, onSignOut }: AppHeaderProps) {
         {menuOpen && (
           <div className="app-header__menu" role="menu">
             <span className="app-header__menu-user">{user?.email}</span>
-            {isDemo && <span className="app-header__menu-demo">Modo demostración</span>}
+            {user?.is_demo && <span className="app-header__menu-demo">Modo demostración</span>}
             <Link to="/profile" role="menuitem" onClick={() => setMenuOpen(false)}>
               Perfil
             </Link>
-            <button type="button" role="menuitem" onClick={onSignOut}>
-              Cerrar sesión
+            <button type="button" role="menuitem" onClick={() => void onSignOut()} disabled={signingOut}>
+              {signingOut ? "Cerrando sesión…" : "Cerrar sesión"}
             </button>
           </div>
         )}
@@ -102,9 +102,9 @@ export function AppHeader({ user, isDemo, onSignOut }: AppHeaderProps) {
           <aside className="app-header__mobile-drawer" aria-label="Menú principal">
             <div className="app-header__mobile-drawer-header">
               <div>
-                <strong>{user?.name}</strong>
+                <strong>{user?.display_name}</strong>
                 <span>{user?.email}</span>
-                {isDemo && <span>Modo demostración</span>}
+                {user?.is_demo && <span>Modo demostración</span>}
               </div>
               <button
                 type="button"
@@ -135,8 +135,8 @@ export function AppHeader({ user, isDemo, onSignOut }: AppHeaderProps) {
               <Link to="/profile" onClick={() => setMenuOpen(false)}>
                 Perfil
               </Link>
-              <button type="button" onClick={onSignOut}>
-                Cerrar sesión
+              <button type="button" onClick={() => void onSignOut()} disabled={signingOut}>
+                {signingOut ? "Cerrando sesión…" : "Cerrar sesión"}
               </button>
             </div>
           </aside>

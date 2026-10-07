@@ -24,6 +24,11 @@ __pycache__/
 # Environment variables
 .env
 .env.*
+!.env.example
+veloform.db
+*.db
+*.sqlite
+*.sqlite3
 
 # Local datasets
 data/raw/
@@ -39,4 +44,3 @@ frontend/dist/
 frontend/.vite/
 frontend/coverage/
 frontend/*.local
-

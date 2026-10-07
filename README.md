@@ -68,6 +68,70 @@ El modelo de respuesta utilizado por defecto es:
 artifacts/response_balanced_linear.json
 ```
 
+## Backend de autenticación
+
+El backend FastAPI separa la identidad de Google de la sesión propia de
+Veloform. Google será el único proveedor real; Veloform no recibe ni almacena
+contraseñas de Google. El acceso demo solo está disponible en desarrollo.
+
+Configura el entorno local:
+
+```bash
+cp .env.example .env
+openssl rand -hex 32
+```
+
+Pega el secreto generado en `SESSION_SECRET` y configura `GOOGLE_CLIENT_ID`
+cuando conectes Google Identity Services. No guardes el archivo `.env` en Git.
+
+Instala las dependencias, aplica la migración y arranca la API:
+
+```bash
+python -m pip install -r requirements.txt
+python -m alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+La documentación interactiva queda disponible en `http://localhost:8000/docs`.
+Puedes comprobar el estado con `curl http://localhost:8000/api/health`.
+
+Durante el desarrollo, `POST /api/auth/demo` crea una sesión demo. Las sesiones
+usan cookies HttpOnly y solo guardan el hash del token en la base de datos.
+Antes de exponer endpoints mutables protegidos en producción se debe revisar
+la protección CSRF; esta primera fase utiliza `SameSite=Lax`, CORS con origen
+exacto y cookies HttpOnly como base.
+
+### Frontend y Google
+
+Arranca el frontend en una segunda terminal:
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Vite hace proxy de `/api` hacia `http://localhost:8000`, por lo que las
+peticiones conservan la cookie de sesión sin configurar CORS adicional en el
+navegador. La interfaz consulta `/api/auth/me` al arrancar y no guarda sesiones
+ni tokens en `localStorage`; únicamente conserva allí los datos simulados de
+perfil y actividades.
+
+Para activar Google, crea un cliente OAuth de tipo aplicación web en Google
+Cloud Console y añade `http://localhost:5173` como origen autorizado. Copia el
+Client ID en `frontend/.env`:
+
+```dotenv
+VITE_GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
+VITE_ENABLE_DEMO_AUTH=true
+```
+
+Este flujo usa Google Identity Services para recibir un ID token y lo envía
+inmediatamente a `POST /api/auth/google`. No necesitas un Client Secret en
+React ni debes guardarlo en el frontend. El modo demo requiere
+`APP_ENV=development` en el backend.
+
 Se puede indicar otro artefacto mediante:
 
 ```bash

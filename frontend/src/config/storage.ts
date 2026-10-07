@@ -1,12 +1,9 @@
 export const storageKeys = {
-  session: "veloform-session",
-  demoSession: "veloform-demo-session",
   profile: "veloform-profile",
   activities: "veloform-activities",
 } as const;
 
 const legacyStorageKeys = {
-  session: "cycling-training-session",
   profile: "cycling-training-profile",
   activities: "cycling-training-activities",
 } as const;

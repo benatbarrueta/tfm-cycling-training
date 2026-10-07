@@ -7,8 +7,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { useEffect } from "react";
-import { flushSync } from "react-dom";
+import { useEffect, useState } from "react";
 import { AppHeader } from "./components/AppHeader";
 import { useAuth } from "./hooks/useAuth";
 import { AuthPage } from "./pages/AuthPage";
@@ -25,55 +24,45 @@ import "./styles/App.css";
 function App() {
   const auth = useAuth();
 
+  if (auth.status === "loading") {
+    return <div className="app-loading" role="status">Comprobando sesión…</div>;
+  }
+
   return (
     <BrowserRouter>
       <AppRoutes
-        isAuthenticated={auth.isAuthenticated}
-        user={auth.user}
-        isDemo={auth.isDemo}
-        onSignIn={auth.signInDemo}
-        onSignOut={auth.signOut}
+        auth={auth}
       />
     </BrowserRouter>
   );
 }
 
 interface AppRoutesProps {
-  isAuthenticated: boolean;
-  user: ReturnType<typeof useAuth>["user"];
-  isDemo: boolean;
-  onSignIn: ReturnType<typeof useAuth>["signInDemo"];
-  onSignOut: ReturnType<typeof useAuth>["signOut"];
+  auth: ReturnType<typeof useAuth>;
 }
 
-function AppRoutes({
-  isAuthenticated,
-  user,
-  isDemo,
-  onSignIn,
-  onSignOut,
-}: AppRoutesProps) {
+function AppRoutes({ auth }: AppRoutesProps) {
   const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
 
-  function signOut() {
-    flushSync(() => {
-      onSignOut();
-    });
-    navigate("/login", { replace: true });
-  }
-
-  function signIn() {
-    onSignIn();
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await auth.logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   return (
     <>
       <ScrollToTop />
       <PageTitle />
-      {isAuthenticated && (
-        <AppHeader user={user} isDemo={isDemo} onSignOut={signOut} />
+      {auth.isAuthenticated && (
+        <AppHeader user={auth.user} onSignOut={signOut} signingOut={signingOut} />
       )}
-      {isAuthenticated && isDemo && (
+      {auth.user?.is_demo && (
         <div className="demo-banner" role="status">
           Estás utilizando Veloform en modo demostración.
         </div>
@@ -83,15 +72,15 @@ function AppRoutes({
         <Route
           element={
             <PublicOnly
-              isAuthenticated={isAuthenticated}
+              isAuthenticated={auth.isAuthenticated}
             />
           }
         >
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<AuthPage mode="login" onDemoAccess={signIn} />} />
-          <Route path="/register" element={<AuthPage mode="register" onDemoAccess={signIn} />} />
+          <Route path="/login" element={<AuthPage mode="login" onDemoAccess={auth.loginAsDemo} onGoogleLogin={auth.loginWithGoogle} />} />
+          <Route path="/register" element={<AuthPage mode="register" onDemoAccess={auth.loginAsDemo} onGoogleLogin={auth.loginWithGoogle} />} />
         </Route>
-        <Route element={<PrivateRoutes isAuthenticated={isAuthenticated} />}>
+        <Route element={<PrivateRoutes isAuthenticated={auth.isAuthenticated} />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/activities" element={<ActivitiesPage />} />
@@ -100,7 +89,7 @@ function AppRoutes({
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
         </Route>
-        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
+        <Route path="*" element={<Navigate to={auth.isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>
     </>
   );
