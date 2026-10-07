@@ -132,6 +132,11 @@ inmediatamente a `POST /api/auth/google`. No necesitas un Client Secret en
 React ni debes guardarlo en el frontend. El modo demo requiere
 `APP_ENV=development` en el backend.
 
+El perfil ciclista se guarda mediante `PUT /api/profile` en la base de datos y
+se recupera con `GET /api/profile`. Antes de utilizar las rutas del dashboard,
+un usuario autenticado sin perfil es dirigido a `/onboarding`; la fecha de
+objetivo solo es obligatoria para el objetivo `RACE`.
+
 Se puede indicar otro artefacto mediante:
 
 ```bash

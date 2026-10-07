@@ -19,6 +19,7 @@ import { SeasonPlanPage, } from "./pages/SeasonPlanPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { ProgressPage } from "./pages/ProgressPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
+import { useCyclistProfile } from "./hooks/useCyclistProfile";
 import "./styles/App.css";
 
 function App() {
@@ -81,11 +82,13 @@ function AppRoutes({ auth }: AppRoutesProps) {
           <Route path="/register" element={<AuthPage mode="register" onDemoAccess={auth.loginAsDemo} onGoogleLogin={auth.loginWithGoogle} />} />
         </Route>
         <Route element={<PrivateRoutes isAuthenticated={auth.isAuthenticated} />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/activities" element={<ActivitiesPage />} />
-          <Route path="/plan" element={<SeasonPlanPage />} />
-          <Route path="/progress" element={<ProgressPage />} />
+          <Route element={<ProfileRequired />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/activities" element={<ActivitiesPage />} />
+            <Route path="/plan" element={<SeasonPlanPage />} />
+            <Route path="/progress" element={<ProgressPage />} />
+          </Route>
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
         </Route>
@@ -93,6 +96,12 @@ function AppRoutes({ auth }: AppRoutesProps) {
       </Routes>
     </>
   );
+}
+
+function ProfileRequired() {
+  const { profile, loading } = useCyclistProfile();
+  if (loading) return <div className="app-loading" role="status">Cargando perfil…</div>;
+  return profile ? <Outlet /> : <Navigate to="/onboarding" replace />;
 }
 
 function ScrollToTop() {

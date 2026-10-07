@@ -16,7 +16,7 @@ from app.auth.google import GoogleIdentity
 from app.auth.sessions import hash_token, utc_now
 from app.core.config import Settings, get_settings
 from app.database.base import Base
-from app.database.models import UserSession
+from app.database.models import CyclistProfile, UserSession
 from app.database.session import get_db
 from app.main import app
 from app.api.routes import auth
@@ -75,6 +75,7 @@ client = TestClient(app)
 def setup_function():
     with TestingSession() as db:
         db.query(UserSession).delete()
+        db.query(CyclistProfile).delete()
         for table in reversed(Base.metadata.sorted_tables):
             if table.name == "users":
                 db.execute(table.delete())
@@ -142,3 +143,46 @@ def test_expired_session_is_rejected():
         db.commit()
 
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_cyclist_profile_requires_authentication_and_persists_owner_data():
+    assert client.get("/api/profile").status_code == 401
+    client.post("/api/auth/demo")
+    payload = {
+        "ftp": 280,
+        "weekly_hours": 10,
+        "available_days": ["SUNDAY", "TUESDAY", "TUESDAY"],
+        "modality": "XCO",
+        "level": "ADVANCED",
+        "objective": "PERFORMANCE",
+        "target_date": None,
+        "timezone": "Europe/Madrid",
+    }
+    assert client.put("/api/profile", json=payload).status_code == 422
+
+    payload["available_days"] = ["SUNDAY", "TUESDAY", "FRIDAY"]
+    response = client.put("/api/profile", json=payload)
+    assert response.status_code == 200
+    assert response.json()["available_days"] == ["TUESDAY", "FRIDAY", "SUNDAY"]
+    assert client.get("/api/profile").json()["ftp"] == 280
+
+    with TestingSession() as db:
+        assert db.query(CyclistProfile).count() == 1
+
+
+def test_profile_validates_domain_and_race_date():
+    client.post("/api/auth/demo")
+    base = {
+        "ftp": 250,
+        "weekly_hours": 8,
+        "available_days": ["TUESDAY"],
+        "modality": "XCO",
+        "level": "INTERMEDIATE",
+        "objective": "RACE",
+        "target_date": None,
+        "timezone": "Europe/Madrid",
+    }
+    assert client.put("/api/profile", json=base).status_code == 422
+    base["target_date"] = "2030-06-01"
+    base["timezone"] = "not/a/timezone"
+    assert client.put("/api/profile", json=base).status_code == 422

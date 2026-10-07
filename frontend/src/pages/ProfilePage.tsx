@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import {
@@ -11,7 +11,7 @@ import {
   type CyclistFormValues,
 } from "../schemas/cyclistSchema";
 import "../styles/ProfilePage.css";
-import { readMigratedStorage, storageKeys } from "../config/storage";
+import { useCyclistProfile } from "../hooks/useCyclistProfile";
 
 const modalityLabels = {
   ROAD: "Carretera",
@@ -41,7 +41,7 @@ const weekDayLabels = {
   SUNDAY: "Domingo",
 } as const;
 
-function loadProfile(): CyclistFormValues {
+function defaultProfile(): CyclistFormValues {
   const defaultProfile: CyclistFormValues = {
     ftp: 250,
     weekly_hours: 8,
@@ -57,18 +57,18 @@ function loadProfile(): CyclistFormValues {
     ],
   };
 
-  return readMigratedStorage("profile", (value) => {
-    const result = cyclistSchema.safeParse(value);
-    return result.success ? result.data : null;
-  }) ?? defaultProfile;
+  return defaultProfile;
 }
 
 export function ProfilePage({ onSaved }: { onSaved?: () => void } = {}) {
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const { profile, loading, error: profileError, save } = useCyclistProfile();
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: {
       errors,
       isSubmitting,
@@ -79,19 +79,39 @@ export function ProfilePage({ onSaved }: { onSaved?: () => void } = {}) {
     CyclistFormValues
   >({
     resolver: zodResolver(cyclistSchema),
-    defaultValues: loadProfile(),
+    defaultValues: defaultProfile(),
   });
 
-  function saveProfile(
+  useEffect(() => {
+    if (profile) {
+      reset({
+        ftp: profile.ftp,
+        weekly_hours: profile.weekly_hours,
+        modality: profile.modality,
+        level: profile.level,
+        objective: profile.objective,
+        objective_date: profile.target_date,
+        available_days: profile.available_days,
+      });
+    }
+  }, [profile, reset]);
+
+  async function saveProfile(
     values: CyclistFormValues,
   ) {
-    localStorage.setItem(
-      storageKeys.profile,
-      JSON.stringify(values),
-    );
+    try {
+      await save(values);
+      setSaved(true);
+      setSaveError(null);
+      onSaved?.();
+    } catch (cause) {
+      setSaved(false);
+      setSaveError(cause instanceof Error ? cause.message : "No se ha podido guardar el perfil.");
+    }
+  }
 
-    setSaved(true);
-    onSaved?.();
+  if (loading) {
+    return <main className="profile-page"><p role="status">Cargando perfil…</p></main>;
   }
 
   return (
@@ -258,10 +278,10 @@ export function ProfilePage({ onSaved }: { onSaved?: () => void } = {}) {
         </section>
 
         <footer className="profile-form__footer">
-          <p>
+          <p role={profileError || saveError ? "alert" : undefined}>
             {saved
               ? "Perfil guardado correctamente."
-              : "Los cambios se guardarán localmente."}
+              : saveError ?? profileError ?? "Los cambios se guardarán en tu cuenta."}
           </p>
 
           <button
