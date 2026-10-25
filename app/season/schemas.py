@@ -49,6 +49,26 @@ class PlannedWorkoutRead(BaseModel):
     outside_training_range_features: list[str] | None
 
 
+class WeeklyReviewRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    planned_tss: float
+    registered_tss: float
+    tss_coverage: float
+    planned_duration_minutes: float
+    registered_duration_minutes: float
+    planned_workout_count: int
+    completed_workout_count: int
+    activity_count: int
+    activities_with_tss: int
+    activities_without_tss: int
+    response_median: float | None
+    response_count: int
+    load_decision: str | None
+    decision_reason: str | None
+    closed_at: datetime
+
+
 class PlannedWeekRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
@@ -68,6 +88,31 @@ class PlannedWeekRead(BaseModel):
     load_decision: str | None
     generated_at: datetime | None
     workouts: list[PlannedWorkoutRead] = Field(default_factory=list)
+    review: WeeklyReviewRead | None = None
+
+
+class AdaptationEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    source_week_id: UUID
+    target_week_id: UUID | None
+    previous_target_tss: float
+    provisional_target_tss: float | None
+    adapted_target_tss: float | None
+    load_decision: str | None
+    observed_aerobic_decoupling: float | None
+    response_classification: str
+    reason: str
+    rule_version: str
+    created_at: datetime
+
+
+class AdvanceSeasonPlanRead(BaseModel):
+    status: str
+    already_processed: bool = False
+    completed_week: PlannedWeekRead
+    adaptation: AdaptationEventRead
+    active_week: PlannedWeekRead | None
 
 
 class TrainingPhaseRead(BaseModel):

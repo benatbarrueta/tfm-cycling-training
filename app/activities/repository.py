@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.database.models import ActivityRecord
+from app.database.models import ActivityRecord, PlannedWeek, PlannedWorkout, SeasonPlan
 
 
 def list_for_user(
@@ -22,6 +22,22 @@ def list_for_user(
 
 def get_by_id_for_user(db: Session, activity_id: UUID, user_id: UUID) -> ActivityRecord | None:
     return db.scalar(select(ActivityRecord).where(ActivityRecord.id == activity_id, ActivityRecord.user_id == user_id))
+
+
+def get_workout_for_user(
+    db: Session,
+    planned_workout_id: UUID,
+    user_id: UUID,
+) -> PlannedWorkout | None:
+    return db.scalar(
+        select(PlannedWorkout)
+        .join(PlannedWeek)
+        .join(SeasonPlan)
+        .where(
+            PlannedWorkout.id == planned_workout_id,
+            SeasonPlan.user_id == user_id,
+        )
+    )
 
 
 def create_for_user(db: Session, user_id: UUID, data: dict) -> ActivityRecord:

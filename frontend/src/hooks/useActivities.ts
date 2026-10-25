@@ -3,6 +3,7 @@ import {
   createActivity,
   deleteActivity,
   listActivities,
+  linkActivityToWorkout,
   updateActivity,
   type Activity,
   type ActivityFilters,
@@ -77,5 +78,11 @@ export function useActivities(filters: ActivityFilters = emptyFilters, enabled =
     setTotal((current) => Math.max(0, current - 1));
   }, []);
 
-  return { activities, total, status, error, refresh, addActivity, editActivity, removeActivity };
+  const linkActivity = useCallback(async (id: string, plannedWorkoutId: string | null) => {
+    const activity = await linkActivityToWorkout(id, plannedWorkoutId);
+    setActivities((current) => current.map((item) => item.id === id ? activity : item));
+    return activity;
+  }, []);
+
+  return { activities, total, status, error, refresh, addActivity, editActivity, removeActivity, linkActivity };
 }

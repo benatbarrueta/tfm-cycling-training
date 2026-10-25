@@ -147,6 +147,8 @@ actividad pertenece al usuario autenticado y se gestiona mediante:
 - `POST /api/activities` para registrar una actividad manual.
 - `GET /api/activities/{id}` para consultar el detalle.
 - `PUT /api/activities/{id}` para editarla.
+- `PUT /api/activities/{id}/planned-workout` para vincularla o desvincularla
+  de una sesión planificada del mismo día.
 - `DELETE /api/activities/{id}` para eliminarla.
 
 Son obligatorios el título, `started_at` con zona horaria y la duración.
@@ -164,9 +166,30 @@ python -m alembic upgrade head
 Las actividades manuales siempre se guardan con `source=MANUAL`; el cliente
 no puede cambiar el propietario ni el origen. Las importaciones FIT, TCX,
 GoldenCheetah y servicios externos quedan pendientes. El plan de temporada,
-los workouts planificados, el dashboard y el calendario consumen la API
-persistida. La vista Evolución conserva gráficas de demostración hasta
-disponer de suficientes semanas completadas y adaptadas.
+los workouts planificados, el dashboard, el calendario y la vista Evolución
+consumen la API persistida.
+
+### Cierre y adaptación semanal
+
+Cuando termina la semana activa, Inicio muestra la acción «Revisar semana y
+preparar la siguiente». `POST /api/season-plans/current/advance` ejecuta el
+cierre de forma atómica:
+
+1. Reúne todas las actividades registradas dentro de la semana.
+2. Calcula TSS y duración realizados, cobertura de TSS, sesiones vinculadas y
+   mediana de desacoplamiento.
+3. Guarda una revisión semanal y un evento de adaptación trazable.
+4. Marca la semana terminada como `COMPLETED`.
+5. Convierte la siguiente semana provisional en `ACTIVE` y genera sus
+   sesiones con el historial actualizado.
+
+Una actividad adicional cuenta para la carga semanal, pero sólo una actividad
+vinculada a un workout cuenta como cumplimiento de esa sesión. La operación es
+idempotente: repetirla no crea otra revisión ni vuelve a generar la semana.
+Evolución muestra exclusivamente revisiones semanales reales, avisa cuando
+faltan TSS o desacoplamiento y permite recalcular sus métricas si una actividad
+se corrige después del cierre. Este recálculo actualiza los resultados
+observados, pero conserva la decisión histórica que generó la semana siguiente.
 
 Se puede indicar otro artefacto mediante:
 
@@ -956,7 +979,8 @@ El proyecto presenta actualmente estas limitaciones:
   interválicas o muy variables.
 - La clasificación del 5 % simplifica una respuesta fisiológica continua.
 - La política de adaptación no representa una validación clínica.
-- No existe todavía una API ni una interfaz de usuario.
+- El cierre semanal requiere actualmente una acción explícita del usuario; no
+  existe todavía un proceso programado que lo ejecute en segundo plano.
 - La generalización debe evaluarse con más atletas y datos externos.
 
 ## Estado actual
@@ -979,6 +1003,12 @@ Están implementados:
 - Generación determinista de sesiones.
 - Ajuste del plan a las restricciones del ciclista.
 - Trazabilidad de la recomendación.
+- Persistencia de perfiles, actividades, planes, semanas y sesiones.
+- API FastAPI y aplicación web React.
+- Asociación entre actividades realizadas y sesiones planificadas.
+- Cierre semanal idempotente con auditoría de resultados.
+- Regeneración adaptativa de la siguiente semana.
+- Evolución basada en revisiones reales persistidas.
 - Resumen serializable del plan.
 - Demostración ejecutable de extremo a extremo.
 
@@ -986,10 +1016,9 @@ Están implementados:
 
 Los siguientes desarrollos previstos son:
 
-1. Persistir perfiles e historiales de ciclistas.
-2. Exponer el generador mediante una API.
-3. Añadir una interfaz para consultar el calendario semanal.
-4. Ampliar el número y variedad de atletas.
-5. Evaluar la calibración temporal en ciclistas conocidos.
-6. Analizar por separado sesiones continuas e interválicas.
-7. Revisar la política de adaptación con un especialista en entrenamiento.
+1. Automatizar el cierre semanal con un proceso programado y notificaciones.
+2. Importar actividades desde FIT, TCX, GoldenCheetah o servicios externos.
+3. Ampliar el número y variedad de atletas.
+4. Evaluar la calibración temporal en ciclistas conocidos.
+5. Analizar por separado sesiones continuas e interválicas.
+6. Revisar la política de adaptación con un especialista en entrenamiento.

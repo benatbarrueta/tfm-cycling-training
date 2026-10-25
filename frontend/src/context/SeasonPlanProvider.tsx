@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createSeasonPlan, getCurrentSeasonPlan, type SeasonPlan } from "../api/seasonPlans";
+import { advanceCurrentSeasonPlan, createSeasonPlan, getCurrentSeasonPlan, type SeasonPlan } from "../api/seasonPlans";
 import type { ApiError } from "../api/client";
 import { SeasonPlanContext, type SeasonPlanStatus } from "./seasonPlanContext";
 
@@ -35,6 +35,24 @@ export function SeasonPlanProvider({ children }: { children: React.ReactNode }) 
     return created;
   }, []);
 
+  const advance = useCallback(async () => {
+    const result = await advanceCurrentSeasonPlan();
+    if (result.active_week === null && result.status === "COMPLETED") {
+      setPlan((current) => current === null ? null : {
+        ...current,
+        status: "COMPLETED",
+        weeks: current.weeks.map((week) =>
+          week.id === result.completed_week.id ? result.completed_week : week,
+        ),
+      });
+    } else {
+      setPlan(await getCurrentSeasonPlan());
+    }
+    setStatus("ready");
+    setError(null);
+    return result;
+  }, []);
+
   useEffect(() => {
     let active = true;
     void getCurrentSeasonPlan()
@@ -60,8 +78,8 @@ export function SeasonPlanProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const value = useMemo(
-    () => ({ plan, status, error, refresh, create }),
-    [create, error, plan, refresh, status],
+    () => ({ plan, status, error, refresh, create, advance }),
+    [advance, create, error, plan, refresh, status],
   );
   return <SeasonPlanContext.Provider value={value}>{children}</SeasonPlanContext.Provider>;
 }

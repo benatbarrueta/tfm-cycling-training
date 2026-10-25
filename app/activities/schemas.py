@@ -60,6 +60,7 @@ class ActivityRead(ActivityInput):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    planned_workout_id: UUID | None
     started_at: datetime
     source: ActivitySource
     created_at: datetime
@@ -78,3 +79,9 @@ class ActivityListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ActivityWorkoutLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    planned_workout_id: UUID | None

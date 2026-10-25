@@ -5,10 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.activities import repository, service
-from app.activities.schemas import ActivityCreate, ActivityListResponse, ActivityRead, ActivityUpdate
+from app.activities.schemas import (
+    ActivityCreate,
+    ActivityListResponse,
+    ActivityRead,
+    ActivityUpdate,
+    ActivityWorkoutLink,
+)
 from app.api.dependencies import get_current_user
 from app.database.models import User
 from app.database.session import get_db
+from app.profile.repository import get_profile
 
 router = APIRouter(prefix="/activities")
 
@@ -53,6 +60,32 @@ def get_activity(activity_id: UUID, user: User = Depends(get_current_user), db: 
 @router.put("/{activity_id}", response_model=ActivityRead)
 def update_activity(activity_id: UUID, payload: ActivityUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ActivityRead:
     activity = service.update(db, user.id, activity_id, payload)
+    if activity is None:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    return activity
+
+
+@router.put("/{activity_id}/planned-workout", response_model=ActivityRead)
+def link_activity_to_workout(
+    activity_id: UUID,
+    payload: ActivityWorkoutLink,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ActivityRead:
+    profile = get_profile(db, user.id)
+    timezone_name = profile.timezone if profile is not None else "UTC"
+    try:
+        activity = service.link_to_workout(
+            db,
+            user.id,
+            activity_id,
+            payload.planned_workout_id,
+            timezone_name,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if activity is None:
         raise HTTPException(status_code=404, detail="Activity not found")
     return activity

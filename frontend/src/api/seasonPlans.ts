@@ -38,6 +38,49 @@ export interface PlannedWeek {
   load_decision: string | null;
   generated_at: string | null;
   workouts: PlannedWorkout[];
+  review: WeeklyReview | null;
+}
+
+export interface WeeklyReview {
+  id: string;
+  planned_tss: number;
+  registered_tss: number;
+  tss_coverage: number;
+  planned_duration_minutes: number;
+  registered_duration_minutes: number;
+  planned_workout_count: number;
+  completed_workout_count: number;
+  activity_count: number;
+  activities_with_tss: number;
+  activities_without_tss: number;
+  response_median: number | null;
+  response_count: number;
+  load_decision: string | null;
+  decision_reason: string | null;
+  closed_at: string;
+}
+
+export interface AdaptationEvent {
+  id: string;
+  source_week_id: string;
+  target_week_id: string | null;
+  previous_target_tss: number;
+  provisional_target_tss: number | null;
+  adapted_target_tss: number | null;
+  load_decision: string | null;
+  observed_aerobic_decoupling: number | null;
+  response_classification: string;
+  reason: string;
+  rule_version: string;
+  created_at: string;
+}
+
+export interface AdvanceSeasonPlanResponse {
+  status: string;
+  already_processed: boolean;
+  completed_week: PlannedWeek;
+  adaptation: AdaptationEvent;
+  active_week: PlannedWeek | null;
 }
 
 export interface SeasonPlan {
@@ -68,4 +111,17 @@ export function createSeasonPlan(name: string) {
     method: "POST",
     body: JSON.stringify({ name }),
   });
+}
+
+export function advanceCurrentSeasonPlan() {
+  return apiRequest<AdvanceSeasonPlanResponse>("/api/season-plans/current/advance", {
+    method: "POST",
+  });
+}
+
+export function recalculateWeekReview(weekId: string) {
+  return apiRequest<WeeklyReview>(
+    `/api/season-plans/current/weeks/${weekId}/review/recalculate`,
+    { method: "POST" },
+  );
 }

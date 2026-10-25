@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 
 export interface Activity {
   id: string;
+  planned_workout_id: string | null;
   title: string;
   started_at: string;
   sport: "CYCLING";
@@ -21,7 +22,7 @@ export interface Activity {
 
 export type ActivityInput = Omit<
   Activity,
-  "id" | "source" | "created_at" | "updated_at"
+  "id" | "planned_workout_id" | "source" | "created_at" | "updated_at"
 >;
 
 export interface ActivityListResponse {
@@ -67,4 +68,11 @@ export function updateActivity(id: string, input: ActivityInput) {
 
 export function deleteActivity(id: string) {
   return apiRequest<void>(`/api/activities/${id}`, { method: "DELETE" });
+}
+
+export function linkActivityToWorkout(id: string, plannedWorkoutId: string | null) {
+  return apiRequest<Activity>(`/api/activities/${id}/planned-workout`, {
+    method: "PUT",
+    body: JSON.stringify({ planned_workout_id: plannedWorkoutId }),
+  });
 }

@@ -1,28 +1,26 @@
+import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { useActivities } from "../hooks/useActivities";
-import { seasonPlanMock } from "../mocks/seasonPlan";
+import { useSeasonPlan } from "../hooks/useSeasonPlan";
+import { phaseLabels } from "../lib/labels";
+import { recalculateWeekReview } from "../api/seasonPlans";
 import "../styles/ProgressPage.css";
 
 export function ProgressPage() {
-  const { activities } = useActivities();
-  const weeks = seasonPlanMock.weeks;
-
-  const evaluatedWeeks = weeks.filter(
-    (week) =>
-      week.status === "COMPLETED" ||
-      week.status === "ADAPTED",
-  );
+  const { plan, status, error, refresh } = useSeasonPlan();
+  const [recalculatingWeek, setRecalculatingWeek] = useState<string | null>(null);
+  const [recalculationMessage, setRecalculationMessage] = useState<string | null>(null);
+  const evaluatedWeeks = plan?.weeks.filter((week) => week.review !== null) ?? [];
 
   const plannedTss = evaluatedWeeks.reduce(
     (total, week) =>
-      total + week.planned_tss,
+      total + (week.review?.planned_tss ?? 0),
     0,
   );
 
   const completedTss = evaluatedWeeks.reduce(
     (total, week) =>
-      total + week.completed_tss,
+      total + (week.review?.registered_tss ?? 0),
     0,
   );
 
@@ -31,11 +29,8 @@ export function ProgressPage() {
       ? (completedTss / plannedTss) * 100
       : 0;
 
-  const aerobicResponses = activities
-    .map(
-      (activity) =>
-        activity.aerobic_decoupling,
-    )
+  const aerobicResponses = evaluatedWeeks
+    .map((week) => week.review?.response_median ?? null)
     .filter(
       (value): value is number =>
         value !== null,
@@ -49,12 +44,42 @@ export function ProgressPage() {
         ) / aerobicResponses.length
       : null;
 
-  const maximumTss = Math.max(
-    ...weeks.flatMap((week) => [
-      week.planned_tss,
-      week.completed_tss,
-    ]),
+  const maximumTss = Math.max(1, ...evaluatedWeeks.flatMap((week) => [
+    week.review?.planned_tss ?? 0,
+    week.review?.registered_tss ?? 0,
+  ]));
+  const registeredActivities = evaluatedWeeks.reduce(
+    (total, week) => total + (week.review?.activity_count ?? 0),
+    0,
   );
+  const activitiesWithoutTss = evaluatedWeeks.reduce(
+    (total, week) => total + (week.review?.activities_without_tss ?? 0),
+    0,
+  );
+  const activitiesWithoutResponse = evaluatedWeeks.reduce(
+    (total, week) => total + Math.max(
+      0,
+      (week.review?.activity_count ?? 0) - (week.review?.response_count ?? 0),
+    ),
+    0,
+  );
+
+  async function recalculate(weekId: string) {
+    setRecalculatingWeek(weekId);
+    setRecalculationMessage(null);
+    try {
+      await recalculateWeekReview(weekId);
+      await refresh();
+      setRecalculationMessage("La revisión se ha actualizado con los datos actuales.");
+    } catch (cause) {
+      setRecalculationMessage(cause instanceof Error ? cause.message : "No se pudo actualizar la revisión.");
+    } finally {
+      setRecalculatingWeek(null);
+    }
+  }
+
+  if (status === "loading") return <main className="progress-page"><p>Cargando evolución…</p></main>;
+  if (status === "error") return <main className="progress-page"><p>{error ?? "No se pudo cargar la evolución."}</p><button type="button" onClick={() => void refresh()}>Reintentar</button></main>;
 
   return (
     <main className="progress-page">
@@ -71,10 +96,31 @@ export function ProgressPage() {
         </p>
       </header>
 
-      <p className="progress-page__demo-notice">
-        Vista de demostración: las gráficas históricas todavía utilizan datos
-        de ejemplo. Las actividades recientes se muestran por separado.
-      </p>
+      {evaluatedWeeks.length === 0 && (
+        <p className="progress-page__demo-notice">
+          La evolución aparecerá cuando finalices y revises tu primera semana de entrenamiento.
+        </p>
+      )}
+
+      {evaluatedWeeks.length > 0 && (
+        <section className="progress-page__data-quality">
+          <div>
+            <strong>{registeredActivities} actividades registradas en semanas revisadas</strong>
+            <p>
+              {activitiesWithoutTss === 0
+                ? "Todas tienen TSS."
+                : `${activitiesWithoutTss} sin TSS.`}{" "}
+              {activitiesWithoutResponse === 0
+                ? "Todas tienen desacoplamiento aeróbico."
+                : `${activitiesWithoutResponse} sin desacoplamiento aeróbico.`}
+            </p>
+            <small>
+              Si corriges una actividad después del cierre, actualiza la revisión de su semana.
+            </small>
+            {recalculationMessage !== null && <span role="status">{recalculationMessage}</span>}
+          </div>
+        </section>
+      )}
 
       <section className="progress-page__metrics">
         <article>
@@ -143,16 +189,16 @@ export function ProgressPage() {
         </header>
 
         <div className="progress-chart__weeks">
-          {weeks.map((week) => {
+          {evaluatedWeeks.map((week) => {
             const plannedHeight =
               (
-                week.planned_tss /
+                (week.review?.planned_tss ?? 0) /
                 maximumTss
               ) * 100;
 
             const completedHeight =
               (
-                week.completed_tss /
+                (week.review?.registered_tss ?? 0) /
                 maximumTss
               ) * 100;
 
@@ -167,7 +213,7 @@ export function ProgressPage() {
                     style={{
                       height: `${plannedHeight}%`,
                     }}
-                    title={`${week.planned_tss} TSS planificados`}
+                    title={`${week.review?.planned_tss ?? 0} TSS planificados`}
                   />
 
                   <div
@@ -175,7 +221,7 @@ export function ProgressPage() {
                     style={{
                       height: `${completedHeight}%`,
                     }}
-                    title={`${week.completed_tss} TSS realizados`}
+                    title={`${week.review?.registered_tss ?? 0} TSS realizados`}
                   />
                 </div>
 
@@ -189,7 +235,14 @@ export function ProgressPage() {
                   )}
                 </strong>
 
-                <small>{week.phase}</small>
+                <small>{phaseLabels[week.phase as keyof typeof phaseLabels]}</small>
+                <button
+                  type="button"
+                  disabled={recalculatingWeek === week.id}
+                  onClick={() => void recalculate(week.id)}
+                >
+                  {recalculatingWeek === week.id ? "Actualizando…" : "Actualizar revisión"}
+                </button>
               </article>
             );
           })}
@@ -212,18 +265,13 @@ export function ProgressPage() {
           </div>
         ) : (
           <div className="progress-responses__values">
-            {activities
-              .filter(
-                (activity) =>
-                  activity.aerobic_decoupling !==
-                  null,
-              )
-              .map((activity) => (
-                <article key={activity.id}>
-                  <span>{new Date(activity.started_at).toLocaleDateString("es-ES")}</span>
+            {evaluatedWeeks
+              .filter((week) => week.review?.response_median !== null)
+              .map((week) => (
+                <article key={week.id}>
+                  <span>Semana del {format(parseISO(week.week_start), "d MMM", { locale: es })}</span>
                   <strong>
-                    {activity.aerobic_decoupling
-                      ?.toFixed(1)}
+                    {week.review?.response_median?.toFixed(1)}
                     %
                   </strong>
                 </article>

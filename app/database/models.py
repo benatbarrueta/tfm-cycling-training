@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Uuid
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -76,6 +76,12 @@ class ActivityRecord(Base):
     user_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    planned_workout_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("planned_workouts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     sport: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -92,6 +98,7 @@ class ActivityRecord(Base):
     notes: Mapped[str | None] = mapped_column(String(4000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    planned_workout: Mapped["PlannedWorkout | None"] = relationship(back_populates="activities")
 
 
 class SeasonPlan(Base):
@@ -156,6 +163,9 @@ class PlannedWeek(Base):
     season_plan: Mapped[SeasonPlan] = relationship(back_populates="weeks")
     training_phase: Mapped[TrainingPhase] = relationship(back_populates="weeks")
     workouts: Mapped[list["PlannedWorkout"]] = relationship(back_populates="planned_week", cascade="all, delete-orphan")
+    review: Mapped["WeeklyReview | None"] = relationship(
+        back_populates="planned_week", cascade="all, delete-orphan", uselist=False
+    )
 
     @property
     def phase(self) -> str:
@@ -184,3 +194,61 @@ class PlannedWorkout(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
     planned_week: Mapped[PlannedWeek] = relationship(back_populates="workouts")
+    activities: Mapped[list[ActivityRecord]] = relationship(back_populates="planned_workout")
+
+
+class WeeklyReview(Base):
+    __tablename__ = "weekly_reviews"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    planned_week_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("planned_weeks.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+    planned_tss: Mapped[float] = mapped_column(Float, nullable=False)
+    registered_tss: Mapped[float] = mapped_column(Float, nullable=False)
+    tss_coverage: Mapped[float] = mapped_column(Float, nullable=False)
+    planned_duration_minutes: Mapped[float] = mapped_column(Float, nullable=False)
+    registered_duration_minutes: Mapped[float] = mapped_column(Float, nullable=False)
+    planned_workout_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_workout_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    activity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    activities_with_tss: Mapped[int] = mapped_column(Integer, nullable=False)
+    activities_without_tss: Mapped[int] = mapped_column(Integer, nullable=False)
+    response_median: Mapped[float | None] = mapped_column(Float)
+    response_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    load_decision: Mapped[str | None] = mapped_column(String(32))
+    decision_reason: Mapped[str | None] = mapped_column(String(1000))
+    closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    planned_week: Mapped[PlannedWeek] = relationship(back_populates="review")
+
+
+class AdaptationEvent(Base):
+    __tablename__ = "adaptation_events"
+    __table_args__ = (
+        UniqueConstraint("source_week_id", name="uq_adaptation_events_source_week"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    season_plan_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("season_plans.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_week_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("planned_weeks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_week_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("planned_weeks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    previous_target_tss: Mapped[float] = mapped_column(Float, nullable=False)
+    provisional_target_tss: Mapped[float | None] = mapped_column(Float)
+    adapted_target_tss: Mapped[float | None] = mapped_column(Float)
+    load_decision: Mapped[str | None] = mapped_column(String(32))
+    observed_aerobic_decoupling: Mapped[float | None] = mapped_column(Float)
+    response_classification: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(String(1000), nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

@@ -169,7 +169,7 @@ export function CalendarPage() {
     setShowActivityForm,
   ] = useState(false);
 
-  const { activities, addActivity, removeActivity } = useActivities(activityFilters);
+  const { activities, addActivity, removeActivity, linkActivity } = useActivities(activityFilters);
 
   const visibleDates = useMemo(
     () => getVisibleDates(selectedDate, view),
@@ -222,15 +222,18 @@ export function CalendarPage() {
 
         let status: CalendarDay["status"];
 
-        const completedTss = dayActivities.reduce(
+        const linkedActivities = plannedWorkout === null
+          ? []
+          : dayActivities.filter((activity) => activity.planned_workout_id === plannedWorkout.id);
+        const completedTss = linkedActivities.reduce(
           (total, activity) => total + (activity.tss ?? 0),
           0,
         );
         const plannedTss = plannedWorkout?.estimated_tss ?? plannedWorkout?.target_tss ?? 0;
 
-        if (dayActivities.length > 0 && plannedTss > 0 && completedTss < plannedTss * 0.8) {
+        if (linkedActivities.length > 0 && plannedTss > 0 && completedTss < plannedTss * 0.8) {
           status = "partial";
-        } else if (dayActivities.length > 0) {
+        } else if (linkedActivities.length > 0) {
           status = "completed";
         } else if (plannedWorkout !== null) {
           status = isoDate < today ? "missed" : "planned";
@@ -306,7 +309,11 @@ export function CalendarPage() {
   }
 
   async function submitActivity(activity: ActivityInput) {
-    await addActivity(activity);
+    const created = await addActivity(activity);
+    const workout = calendarDays[0]?.planned_workout;
+    if (workout !== null && workout !== undefined) {
+      await linkActivity(created.id, workout.id);
+    }
     setView("day");
     setShowActivityForm(false);
   }
@@ -575,13 +582,25 @@ export function CalendarPage() {
 
                   {view === "day" &&
                     day.activities.map((activity) => (
-                      <span key={activity.id}>
-                        {activity.title} ·{" "}
-                        {activity.duration_minutes} min
-                        {activity.tss !== null
-                          ? ` · ${activity.tss.toFixed(0)} TSS`
-                          : ""}
-                      </span>
+                      <div className="calendar-day__activity-link" key={activity.id}>
+                        <span>
+                          {activity.title} · {activity.duration_minutes} min
+                          {activity.tss !== null ? ` · ${activity.tss.toFixed(0)} TSS` : ""}
+                        </span>
+                        {workout !== null && (
+                          <button
+                            type="button"
+                            onClick={() => void linkActivity(
+                              activity.id,
+                              activity.planned_workout_id === workout.id ? null : workout.id,
+                            )}
+                          >
+                            {activity.planned_workout_id === workout.id
+                              ? "Desvincular de la sesión"
+                              : "Vincular con la sesión"}
+                          </button>
+                        )}
+                      </div>
                     ))}
                 </div>
               )}

@@ -30,6 +30,24 @@
   font-size: 0.9rem;
 }
 
+.progress-page__data-quality {
+  padding: 1rem 1.25rem;
+  color: #173d2b;
+  background: #eef6f1;
+  border: 1px solid #bfd8c8;
+  border-radius: 0.85rem;
+}
+
+.progress-page__data-quality p {
+  margin: 0.3rem 0;
+}
+
+.progress-page__data-quality small,
+.progress-page__data-quality span {
+  display: block;
+  color: #637068;
+}
+
 .progress-page__eyebrow {
   margin-bottom: 0.4rem !important;
   color: #27734b;
@@ -170,6 +188,22 @@
 .progress-chart__week small {
   color: #718078;
   font-size: 0.65rem;
+}
+
+.progress-chart__week button {
+  padding: 0.35rem;
+  color: #1f6f49;
+  background: transparent;
+  border: 1px solid #b8d2c1;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.progress-chart__week button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .progress-responses__empty {

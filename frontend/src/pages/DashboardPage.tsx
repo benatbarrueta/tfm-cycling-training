@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -23,7 +24,9 @@ function chooseWeek(weeks: PlannedWeek[], today: string): PlannedWeek | null {
 }
 
 export function DashboardPage() {
-  const { plan, status, error, refresh } = useSeasonPlan();
+  const { plan, status, error, refresh, advance } = useSeasonPlan();
+  const [advanceStatus, setAdvanceStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [advanceMessage, setAdvanceMessage] = useState<string | null>(null);
   const { profile } = useCyclistProfile();
   const referenceDate = getCurrentDate();
   const timezone = profile?.timezone ?? TIMEZONE;
@@ -33,6 +36,9 @@ export function DashboardPage() {
     timezone,
   );
   const selectedWeek = plan === null ? null : chooseWeek(plan.weeks, today);
+  const overdueActiveWeek = plan?.weeks.find(
+    (week) => week.status === "ACTIVE" && week.week_end < today,
+  ) ?? null;
   const activityFilters = {
     start: localDateToUtcIso(currentWeek.weekStart, timezone),
     end: localDateToUtcIso(
@@ -70,6 +76,23 @@ export function DashboardPage() {
     .filter((workout) => workout.scheduled_date >= today)
     .sort((left, right) => left.scheduled_date.localeCompare(right.scheduled_date))[0];
 
+  async function closeWeek() {
+    setAdvanceStatus("loading");
+    setAdvanceMessage(null);
+    try {
+      const result = await advance();
+      setAdvanceStatus("done");
+      setAdvanceMessage(
+        result.already_processed
+          ? "La semana ya estaba revisada."
+          : result.adaptation.reason,
+      );
+    } catch (cause) {
+      setAdvanceStatus("error");
+      setAdvanceMessage(cause instanceof Error ? cause.message : "No se pudo revisar la semana.");
+    }
+  }
+
   return (
     <main className="dashboard">
       <header className="dashboard__welcome">
@@ -91,6 +114,19 @@ export function DashboardPage() {
         </div>
         <Link className="dashboard__primary-link" to="/calendar">Abrir calendario</Link>
       </header>
+
+      {overdueActiveWeek !== null && (
+        <section className="dashboard__weekly-review">
+          <div>
+            <strong>La semana del {format(parseISO(overdueActiveWeek.week_start), "d 'de' MMMM", { locale: es })} ha terminado</strong>
+            <p>Revisa las actividades registradas y prepara la siguiente semana con los datos reales.</p>
+            {advanceMessage !== null && <small>{advanceMessage}</small>}
+          </div>
+          <button type="button" disabled={advanceStatus === "loading"} onClick={() => void closeWeek()}>
+            {advanceStatus === "loading" ? "Revisando…" : "Revisar semana y preparar la siguiente"}
+          </button>
+        </section>
+      )}
 
       <section className="dashboard__metrics">
         <article>

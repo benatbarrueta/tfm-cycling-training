@@ -201,3 +201,33 @@
     grid-template-columns: 1fr;
   }
 }
+.dashboard__weekly-review {
+  display: flex;
+  padding: 1rem 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #143b2a;
+  background: #e5f4ea;
+  border: 1px solid #a9d4b8;
+  border-radius: 0.8rem;
+}
+
+.dashboard__weekly-review p {
+  margin: 0.25rem 0;
+}
+
+.dashboard__weekly-review button {
+  padding: 0.8rem 1rem;
+  color: #fff;
+  background: #1f6f49;
+  border: 0;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.dashboard__weekly-review button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
