@@ -72,6 +72,20 @@ def get_activity_linked_to_workout(
     return db.scalar(query)
 
 
+def get_import_by_fingerprint(
+    db: Session,
+    user_id: UUID,
+    fingerprint: str,
+) -> ActivityRecord | None:
+    return db.scalar(
+        select(ActivityRecord).where(
+            ActivityRecord.user_id == user_id,
+            ActivityRecord.source == "FILE_IMPORT",
+            ActivityRecord.external_source_id == fingerprint,
+        )
+    )
+
+
 def create_for_user(db: Session, user_id: UUID, data: dict) -> ActivityRecord:
     activity = ActivityRecord(user_id=user_id, source="MANUAL", **data)
     db.add(activity)

@@ -9,3 +9,4 @@ google-auth
 requests
 httpx
 httpx2
+fitparse

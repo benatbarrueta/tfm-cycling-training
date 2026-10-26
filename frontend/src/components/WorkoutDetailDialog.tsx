@@ -32,6 +32,11 @@ export function WorkoutDetailDialog({
 }: WorkoutDetailDialogProps) {
   const plannedTss = workout.estimated_tss ?? workout.target_tss;
   const plannedDuration = workout.duration_minutes ?? 0;
+  const summaryPower = workout.target_power_min !== null && workout.target_power_max !== null
+    ? powerRange(workout.target_power_min, workout.target_power_max)
+    : workout.intervals !== null
+      ? `Por intervalos: ${powerRange(workout.intervals.work_power_min, workout.intervals.work_power_max)}`
+      : "Sin rango de potencia";
 
   return (
     <div className="workout-detail__overlay" role="presentation" onMouseDown={onClose}>
@@ -56,7 +61,7 @@ export function WorkoutDetailDialog({
         <dl className="workout-detail__summary">
           <div><dt>Duración</dt><dd>{workout.duration_minutes ?? "—"} min</dd></div>
           <div><dt>TSS previsto</dt><dd>{plannedTss.toFixed(0)}</dd></div>
-          <div><dt>Potencia objetivo</dt><dd>{powerRange(workout.target_power_min, workout.target_power_max)}</dd></div>
+          <div><dt>Potencia objetivo</dt><dd>{summaryPower}</dd></div>
           <div><dt>Respuesta prevista</dt><dd>{workout.predicted_aerobic_decoupling?.toFixed(1) ?? "—"}%</dd></div>
         </dl>
 

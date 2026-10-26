@@ -144,6 +144,10 @@ actividad pertenece al usuario autenticado y se gestiona mediante:
 
 - `GET /api/activities` con `start`, `end`, `limit` y `offset`.
 - `POST /api/activities` para registrar una actividad manual.
+- `POST /api/activities/import/preview` para analizar un archivo FIT o TCX
+  sin guardarlo todavía.
+- `POST /api/activities/import/commit` para guardar los datos revisados de
+  una importación.
 - `GET /api/activities/{id}` para consultar el detalle.
 - `PUT /api/activities/{id}` para editarla.
 - `GET /api/activities/planned-workouts/available?date=YYYY-MM-DD` para
@@ -177,10 +181,14 @@ python -m alembic upgrade head
 ```
 
 Las actividades manuales siempre se guardan con `source=MANUAL`; el cliente
-no puede cambiar el propietario ni el origen. Las importaciones FIT, TCX,
-GoldenCheetah y servicios externos quedan pendientes. El plan de temporada,
-los workouts planificados, el dashboard, el calendario y la vista Evolución
-consumen la API persistida.
+no puede cambiar el propietario ni el origen. La web permite seleccionar un
+archivo FIT o TCX de hasta 20 MB, revisar y corregir los datos extraídos y
+vincular la actividad a una sesión planificada del mismo día. El archivo no
+se conserva: se guarda la actividad con `source=FILE_IMPORT` y una huella
+SHA-256 que impide importar dos veces el mismo archivo para un usuario. Las
+importaciones directas desde GoldenCheetah y servicios externos quedan
+pendientes. El plan de temporada, los workouts planificados, el dashboard,
+el calendario y la vista Evolución consumen la API persistida.
 
 ### Cierre y adaptación semanal
 

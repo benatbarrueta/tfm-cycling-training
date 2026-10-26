@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
 class Sport(str, Enum):
@@ -46,6 +46,13 @@ class ActivityInput(BaseModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("started_at debe incluir zona horaria")
         return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    @field_serializer("started_at", when_used="json")
+    def serialize_started_at(self, value: datetime) -> str:
+        """Expose the internally stored naive UTC value as an absolute instant."""
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class ActivityCreate(ActivityInput):
@@ -96,3 +103,16 @@ class AvailableWorkoutRead(BaseModel):
     target_tss: float
     already_linked: bool
     linked_activity_id: UUID | None
+
+
+class ActivityImportPreview(BaseModel):
+    filename: str
+    fingerprint: str
+    duplicate: bool
+    activity: ActivityCreate
+
+
+class ActivityImportCommit(ActivityCreate):
+    filename: str = Field(min_length=1, max_length=255)
+    fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    planned_workout_id: UUID | None = None

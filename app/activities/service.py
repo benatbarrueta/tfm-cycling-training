@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activities import repository
-from app.activities.schemas import ActivityCreate, ActivityUpdate
+from app.activities.schemas import ActivityCreate, ActivityImportCommit, ActivityUpdate
 from app.database.models import ActivityRecord
 
 
@@ -123,3 +123,45 @@ def available_workouts(
             scheduled_date,
         )
     ]
+
+
+def import_activity(
+    db: Session,
+    user_id: UUID,
+    payload: ActivityImportCommit,
+    timezone_name: str,
+) -> ActivityRecord:
+    if repository.get_import_by_fingerprint(db, user_id, payload.fingerprint) is not None:
+        raise ValueError("Esta actividad ya se ha importado anteriormente.")
+
+    workout = None
+    if payload.planned_workout_id is not None:
+        workout = repository.get_workout_for_user(db, payload.planned_workout_id, user_id)
+        if workout is None:
+            raise LookupError("Planned workout not found")
+        started_at = payload.started_at.replace(tzinfo=timezone.utc)
+        local_date = started_at.astimezone(ZoneInfo(timezone_name)).date()
+        if local_date != workout.scheduled_date:
+            raise ValueError("La actividad y la sesión planificada deben pertenecer al mismo día.")
+        if repository.get_activity_linked_to_workout(db, workout.id) is not None:
+            raise ValueError("Esta sesión ya está vinculada a otra actividad.")
+
+    data = payload.model_dump(
+        exclude={"filename", "fingerprint", "planned_workout_id"},
+        exclude_none=False,
+    )
+    activity = ActivityRecord(
+        user_id=user_id,
+        source="FILE_IMPORT",
+        external_source_id=payload.fingerprint,
+        planned_workout_id=workout.id if workout is not None else None,
+        **data,
+    )
+    db.add(activity)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ValueError("Esta actividad ya se ha importado anteriormente.") from exc
+    db.refresh(activity)
+    return activity

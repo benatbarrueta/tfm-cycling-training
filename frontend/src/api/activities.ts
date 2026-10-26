@@ -50,6 +50,13 @@ export interface AvailablePlannedWorkout {
   linked_activity_id: string | null;
 }
 
+export interface ActivityImportPreview {
+  filename: string;
+  fingerprint: string;
+  duplicate: boolean;
+  activity: ActivityInput;
+}
+
 export function listActivities(filters: ActivityFilters = {}) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
@@ -91,5 +98,32 @@ export function linkActivityToWorkout(id: string, plannedWorkoutId: string | nul
   return apiRequest<Activity>(`/api/activities/${id}/planned-workout`, {
     method: "PUT",
     body: JSON.stringify({ planned_workout_id: plannedWorkoutId }),
+  });
+}
+
+export async function previewActivityFile(file: File) {
+  return apiRequest<ActivityImportPreview>(
+    `/api/activities/import/preview?filename=${encodeURIComponent(file.name)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: await file.arrayBuffer(),
+    },
+  );
+}
+
+export function commitActivityImport(
+  preview: ActivityImportPreview,
+  activity: ActivityInput,
+  plannedWorkoutId: string | null,
+) {
+  return apiRequest<Activity>("/api/activities/import/commit", {
+    method: "POST",
+    body: JSON.stringify({
+      ...activity,
+      filename: preview.filename,
+      fingerprint: preview.fingerprint,
+      planned_workout_id: plannedWorkoutId,
+    }),
   });
 }

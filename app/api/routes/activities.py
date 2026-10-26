@@ -1,12 +1,15 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.activities import repository, service
+from app.activities.file_import import preview_activity_file
 from app.activities.schemas import (
     ActivityCreate,
+    ActivityImportCommit,
+    ActivityImportPreview,
     AvailableWorkoutRead,
     ActivityListResponse,
     ActivityRead,
@@ -48,6 +51,41 @@ def list_activities(
 @router.post("", response_model=ActivityRead, status_code=status.HTTP_201_CREATED)
 def create_activity(payload: ActivityCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ActivityRead:
     return service.create(db, user.id, payload)
+
+
+@router.post("/import/preview", response_model=ActivityImportPreview)
+def preview_import(
+    filename: str = Query(min_length=1, max_length=255),
+    content: bytes = Body(media_type="application/octet-stream"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ActivityImportPreview:
+    try:
+        activity, fingerprint = preview_activity_file(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ActivityImportPreview(
+        filename=filename,
+        fingerprint=fingerprint,
+        duplicate=repository.get_import_by_fingerprint(db, user.id, fingerprint) is not None,
+        activity=ActivityCreate.model_validate(activity),
+    )
+
+
+@router.post("/import/commit", response_model=ActivityRead, status_code=status.HTTP_201_CREATED)
+def commit_import(
+    payload: ActivityImportCommit,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ActivityRead:
+    profile = get_profile(db, user.id)
+    timezone_name = profile.timezone if profile is not None else "UTC"
+    try:
+        return service.import_activity(db, user.id, payload, timezone_name)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/planned-workouts/available", response_model=list[AvailableWorkoutRead])

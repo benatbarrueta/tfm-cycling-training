@@ -69,6 +69,12 @@ class CyclistProfile(Base):
 class ActivityRecord(Base):
     __tablename__ = "activities"
     __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "source",
+            "external_source_id",
+            name="uq_activities_user_source_external_id",
+        ),
         Index("ix_activities_user_started_at", "user_id", "started_at"),
     )
 
