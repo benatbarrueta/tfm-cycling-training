@@ -1,5 +1,6 @@
-import { useState } from "react";
-import type { Activity } from "../api/activities";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { getActivity, type Activity } from "../api/activities";
 import { ActivityForm } from "../components/ActivityForm";
 import { useActivities } from "../hooks/useActivities";
 import "../styles/ActivitiesPage.css";
@@ -15,11 +16,27 @@ function metric(value: number | null, suffix = "") {
 }
 
 export function ActivitiesPage() {
+  const [searchParams] = useSearchParams();
+  const handledEditId = useRef<string | null>(null);
   const { activities, total, status, error, refresh, addActivity, editActivity, removeActivity, linkActivity } = useActivities({ limit: 50 });
   const [editing, setEditing] = useState<Activity | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (editId === null || handledEditId.current === editId) return;
+    handledEditId.current = editId;
+    void getActivity(editId)
+      .then((activity) => {
+        setEditing(activity);
+        setShowForm(false);
+      })
+      .catch((cause: unknown) => {
+        setMessage(cause instanceof Error ? cause.message : "No se ha podido abrir la actividad.");
+      });
+  }, [searchParams]);
 
   async function deleteItem(activity: Activity) {
     if (!window.confirm(`¿Eliminar "${activity.title}" del historial?`)) return;

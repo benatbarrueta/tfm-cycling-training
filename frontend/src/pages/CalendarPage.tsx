@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   addDays,
   addMonths,
@@ -16,6 +16,7 @@ import {
 import { es } from "date-fns/locale";
 import { ActivityForm } from "../components/ActivityForm";
 import { CalendarToolbar } from "../components/CalendarToolbar";
+import { WorkoutDetailDialog } from "../components/WorkoutDetailDialog";
 import {
   CompletedActivityCard,
 } from "../components/CompletedActivityCard";
@@ -30,7 +31,7 @@ import type {
   CalendarView,
 } from "../types/calendar";
 import type { ActivityInput } from "../api/activities";
-import type { PlannedWeek } from "../api/seasonPlans";
+import type { PlannedWeek, PlannedWorkout } from "../api/seasonPlans";
 import "../styles/CalendarPage.css";
 
 const statusLabels = {
@@ -144,6 +145,7 @@ function getCalendarTitle(
 }
 
 export function CalendarPage() {
+  const navigate = useNavigate();
   const { plan: seasonPlan, status, error, refresh } = useSeasonPlan();
   const today = getTodayInTimeZone(getCurrentDate(), "Europe/Madrid");
   const [searchParams] = useSearchParams();
@@ -168,6 +170,9 @@ export function CalendarPage() {
     showActivityForm,
     setShowActivityForm,
   ] = useState(false);
+  const [activityFormWorkoutId, setActivityFormWorkoutId] = useState<string | null>(null);
+  const [selectedWorkout, setSelectedWorkout] = useState<PlannedWorkout | null>(null);
+  const [activityFormError, setActivityFormError] = useState<string | null>(null);
 
   const { activities, addActivity, removeActivity, linkActivity } = useActivities(activityFilters);
 
@@ -308,14 +313,33 @@ export function CalendarPage() {
     setShowActivityForm(false);
   }
 
-  async function submitActivity(activity: ActivityInput) {
-    const created = await addActivity(activity);
-    const workout = calendarDays[0]?.planned_workout;
-    if (workout !== null && workout !== undefined) {
-      await linkActivity(created.id, workout.id);
+  async function submitActivity(activity: ActivityInput, plannedWorkoutId: string | null) {
+    try {
+      const created = await addActivity(activity);
+      if (plannedWorkoutId !== null) {
+        try {
+          await linkActivity(created.id, plannedWorkoutId);
+        } catch (cause) {
+          await removeActivity(created.id);
+          throw cause;
+        }
+      }
+      setView("day");
+      setShowActivityForm(false);
+      setActivityFormWorkoutId(null);
+      setActivityFormError(null);
+    } catch (cause) {
+      setActivityFormError(cause instanceof Error ? cause.message : "No se ha podido guardar la actividad.");
     }
+  }
+
+  function registerWorkout(workout: PlannedWorkout) {
+    setSelectedDate(parseISO(workout.scheduled_date));
     setView("day");
-    setShowActivityForm(false);
+    setActivityFormWorkoutId(workout.id);
+    setShowActivityForm(true);
+    setSelectedWorkout(null);
+    setActivityFormError(null);
   }
 
   return (
@@ -529,7 +553,12 @@ export function CalendarPage() {
               )}
 
               {workout !== null ? (
-                <div className="calendar-day__workout">
+                <button
+                  className="calendar-day__workout"
+                  type="button"
+                  onClick={() => setSelectedWorkout(workout)}
+                  aria-label={`Ver detalle de ${workoutLabels[workout.workout_type as keyof typeof workoutLabels]}`}
+                >
                   <strong>
                     {workoutLabels[workout.workout_type as keyof typeof workoutLabels]}
                   </strong>
@@ -549,7 +578,8 @@ export function CalendarPage() {
                       {prediction.predicted_aerobic_decoupling?.toFixed(1) ?? "—"}%
                     </span>
                   )}
-                </div>
+                  <small>Ver detalle</small>
+                </button>
               ) : plannedWeek?.status ===
                 "PROVISIONAL" ? (
                 view === "day" ? (
@@ -610,10 +640,12 @@ export function CalendarPage() {
                   className="calendar-day__add"
                   type="button"
                   onClick={() =>
-                    setShowActivityForm(
-                      (currentValue) =>
-                        !currentValue,
-                    )
+                    setShowActivityForm((currentValue) => {
+                      const nextValue = !currentValue;
+                      setActivityFormWorkoutId(nextValue ? workout?.id ?? null : null);
+                      setActivityFormError(null);
+                      return nextValue;
+                    })
                   }
                 >
                   {showActivityForm
@@ -646,10 +678,35 @@ export function CalendarPage() {
 
       {view === "day" &&
         showActivityForm && (
-          <ActivityForm
-            onSubmit={submitActivity}
-          />
+          <>
+            <ActivityForm
+              initialValues={{
+                title: activityFormWorkoutId === null || calendarDays[0]?.planned_workout === null
+                  ? ""
+                  : workoutLabels[calendarDays[0].planned_workout.workout_type as keyof typeof workoutLabels],
+                started_at: `${selectedDateText}T18:00`,
+              }}
+              initialPlannedWorkoutId={activityFormWorkoutId}
+              onCancel={() => {
+                setShowActivityForm(false);
+                setActivityFormWorkoutId(null);
+                setActivityFormError(null);
+              }}
+              onSubmit={submitActivity}
+            />
+            {activityFormError !== null && <p className="calendar-page__form-error" role="alert">{activityFormError}</p>}
+          </>
         )}
+
+      {selectedWorkout !== null && (
+        <WorkoutDetailDialog
+          workout={selectedWorkout}
+          activity={activities.find((activity) => activity.planned_workout_id === selectedWorkout.id) ?? null}
+          onClose={() => setSelectedWorkout(null)}
+          onRegister={() => registerWorkout(selectedWorkout)}
+          onEdit={(activityId) => navigate(`/activities?edit=${activityId}`)}
+        />
+      )}
     </main>
   );
 }

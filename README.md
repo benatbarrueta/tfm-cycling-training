@@ -164,6 +164,12 @@ actividad adicional. Cada sesión planificada admite una sola actividad
 vinculada, y la API verifica que ambas pertenecen al mismo día según la zona
 horaria del perfil.
 
+Desde el calendario se puede abrir el detalle de una sesión para consultar su
+estructura, potencias y respuesta prevista. La acción «Registrar actividad
+realizada» abre el formulario con la fecha y la sesión seleccionadas. Cuando
+ya existe una actividad vinculada, el detalle compara su duración y TSS con
+los valores planificados y permite abrirla para editarla.
+
 La tabla `activities` se crea con:
 
 ```bash
