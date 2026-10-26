@@ -172,8 +172,13 @@ consumen la API persistida.
 ### Cierre y adaptación semanal
 
 Cuando termina la semana activa, Inicio muestra la acción «Revisar semana y
-preparar la siguiente». `POST /api/season-plans/current/advance` ejecuta el
-cierre de forma atómica:
+preparar la siguiente». Antes de confirmar, la interfaz consulta
+`GET /api/season-plans/current/weekly-review-preview` y muestra las
+actividades, el TSS, la duración, las sesiones vinculadas y los datos que
+faltan. Esta vista previa no modifica la planificación.
+
+Al confirmar, `POST /api/season-plans/current/advance` ejecuta el cierre de
+forma atómica:
 
 1. Reúne todas las actividades registradas dentro de la semana.
 2. Calcula TSS y duración realizados, cobertura de TSS, sesiones vinculadas y
@@ -190,6 +195,29 @@ Evolución muestra exclusivamente revisiones semanales reales, avisa cuando
 faltan TSS o desacoplamiento y permite recalcular sus métricas si una actividad
 se corrige después del cierre. Este recálculo actualiza los resultados
 observados, pero conserva la decisión histórica que generó la semana siguiente.
+
+La comparación entre el objetivo provisional y el objetivo adaptado puede
+consultarse en el detalle de cada semana. Evolución conserva además el motivo
+de cada decisión mediante `GET /api/season-plans/{plan_id}/adaptations`. Las
+temporadas terminadas siguen disponibles con `GET /api/season-plans`, por lo
+que cerrar la última semana no elimina su calendario ni su historial.
+
+La trazabilidad distingue tres cantidades para evitar confundir una decisión
+de mantener carga con la previsión inicial de la temporada:
+
+- La previsión de temporada calculada al crear el plan.
+- El objetivo solicitado después de revisar la respuesta semanal.
+- El objetivo factible que cabe en los días y horas disponibles.
+
+Si existen varias semanas vencidas, se revisan cronológicamente, una por una.
+Cada confirmación recalcula únicamente la siguiente semana pendiente con la
+información disponible hasta ese momento.
+
+En desarrollo, Inicio muestra un selector de fecha simulada. Permite probar
+el cierre de una semana activa sin cambiar el reloj del equipo ni modificar
+las fechas almacenadas. La selección se conserva únicamente en el navegador
+y puede desactivarse con «Usar fecha real». El backend sólo acepta este valor
+cuando `APP_ENV=development`; en producción no está disponible.
 
 Se puede indicar otro artefacto mediante:
 
@@ -1009,6 +1037,9 @@ Están implementados:
 - Cierre semanal idempotente con auditoría de resultados.
 - Regeneración adaptativa de la siguiente semana.
 - Evolución basada en revisiones reales persistidas.
+- Vista previa del cierre semanal y aviso de datos incompletos.
+- Historial permanente de adaptaciones y temporadas finalizadas.
+- Detalle de cada semana con comparación provisional frente a adaptada.
 - Resumen serializable del plan.
 - Demostración ejecutable de extremo a extremo.
 

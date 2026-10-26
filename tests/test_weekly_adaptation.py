@@ -18,8 +18,13 @@ from app.database.models import (
     WeeklyReview,
     utc_now,
 )
-from app.season.service import advance_plan, recalculate_week_review
-from app.season.schemas import AdvanceSeasonPlanRead
+from app.season.service import (
+    advance_plan,
+    list_adaptations,
+    preview_week_review,
+    recalculate_week_review,
+)
+from app.season.schemas import AdvanceSeasonPlanRead, WeeklyReviewPreviewRead
 from app.season.weekly_review import summarize_completed_week
 
 
@@ -148,6 +153,22 @@ def test_advance_plan_is_transactional_and_idempotent():
         db.add_all([profile, plan, phase, first, second, activity])
         db.commit()
 
+        preview = preview_week_review(
+            db,
+            user.id,
+            profile,
+            reference=date(2026, 10, 12),
+        )
+        assert preview["week_id"] == first.id
+        assert preview["registered_tss"] == pytest.approx(70)
+        assert preview["completed_workout_count"] == 1
+        assert preview["activities_without_tss"] == 0
+        assert preview["activities_without_response"] == 0
+        assert preview["pending_overdue_weeks"] == 1
+        WeeklyReviewPreviewRead.model_validate(preview)
+        assert db.scalar(select(func.count()).select_from(WeeklyReview)) == 0
+        assert db.scalar(select(func.count()).select_from(AdaptationEvent)) == 0
+
         result = advance_plan(
             db,
             user,
@@ -163,6 +184,8 @@ def test_advance_plan_is_transactional_and_idempotent():
         assert len(result["active_week"].workouts) == 3
         response = AdvanceSeasonPlanRead.model_validate(result)
         assert response.adaptation.response_classification == "STABLE"
+        assert "previsión de temporada" in response.adaptation.reason
+        assert "revisión solicitó" in response.adaptation.reason
 
         repeated = advance_plan(
             db,
@@ -174,6 +197,12 @@ def test_advance_plan_is_transactional_and_idempotent():
         assert repeated["already_processed"] is True
         assert db.scalar(select(func.count()).select_from(WeeklyReview)) == 1
         assert db.scalar(select(func.count()).select_from(AdaptationEvent)) == 1
+        adaptations = list_adaptations(db, user.id, plan.id)
+        assert len(adaptations) == 1
+        assert adaptations[0].source_week_id == first.id
+        assert adaptations[0].target_week_id == second.id
+        assert adaptations[0].provisional_target_tss == pytest.approx(105)
+        assert adaptations[0].adapted_target_tss is not None
 
         activity.tss = 85
         activity.aerobic_decoupling = 6

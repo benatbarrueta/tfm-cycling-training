@@ -9,7 +9,7 @@ export interface SeasonPlanContextValue {
   error: string | null;
   refresh: () => Promise<void>;
   create: (name: string) => Promise<SeasonPlan>;
-  advance: () => Promise<AdvanceSeasonPlanResponse>;
+  advance: (referenceDate?: string | null) => Promise<AdvanceSeasonPlanResponse>;
 }
 
 export const SeasonPlanContext = createContext<SeasonPlanContextValue | null>(null);

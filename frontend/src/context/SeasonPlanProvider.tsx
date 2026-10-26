@@ -35,8 +35,8 @@ export function SeasonPlanProvider({ children }: { children: React.ReactNode }) 
     return created;
   }, []);
 
-  const advance = useCallback(async () => {
-    const result = await advanceCurrentSeasonPlan();
+  const advance = useCallback(async (referenceDate?: string | null) => {
+    const result = await advanceCurrentSeasonPlan(referenceDate);
     if (result.active_week === null && result.status === "COMPLETED") {
       setPlan((current) => current === null ? null : {
         ...current,

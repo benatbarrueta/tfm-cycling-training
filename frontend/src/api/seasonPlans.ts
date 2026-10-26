@@ -83,6 +83,25 @@ export interface AdvanceSeasonPlanResponse {
   active_week: PlannedWeek | null;
 }
 
+export interface WeeklyReviewPreview {
+  week_id: string;
+  week_start: string;
+  week_end: string;
+  planned_tss: number;
+  registered_tss: number;
+  planned_duration_minutes: number;
+  registered_duration_minutes: number;
+  planned_workout_count: number;
+  completed_workout_count: number;
+  activity_count: number;
+  activities_with_tss: number;
+  activities_without_tss: number;
+  response_median: number | null;
+  response_count: number;
+  activities_without_response: number;
+  pending_overdue_weeks: number;
+}
+
 export interface SeasonPlan {
   id: string;
   name: string;
@@ -106,6 +125,29 @@ export function getCurrentSeasonPlan() {
   return apiRequest<SeasonPlan>("/api/season-plans/current");
 }
 
+export function listSeasonPlans() {
+  return apiRequest<SeasonPlan[]>("/api/season-plans");
+}
+
+export function getSeasonPlan(id: string) {
+  return apiRequest<SeasonPlan>(`/api/season-plans/${id}`);
+}
+
+export function listPlanAdaptations(id: string) {
+  return apiRequest<AdaptationEvent[]>(`/api/season-plans/${id}/adaptations`);
+}
+
+function withReferenceDate(path: string, referenceDate?: string | null) {
+  if (referenceDate === undefined || referenceDate === null) return path;
+  return `${path}?reference_date=${encodeURIComponent(referenceDate)}`;
+}
+
+export function getWeeklyReviewPreview(referenceDate?: string | null) {
+  return apiRequest<WeeklyReviewPreview>(
+    withReferenceDate("/api/season-plans/current/weekly-review-preview", referenceDate),
+  );
+}
+
 export function createSeasonPlan(name: string) {
   return apiRequest<SeasonPlan>("/api/season-plans", {
     method: "POST",
@@ -113,8 +155,8 @@ export function createSeasonPlan(name: string) {
   });
 }
 
-export function advanceCurrentSeasonPlan() {
-  return apiRequest<AdvanceSeasonPlanResponse>("/api/season-plans/current/advance", {
+export function advanceCurrentSeasonPlan(referenceDate?: string | null) {
+  return apiRequest<AdvanceSeasonPlanResponse>(withReferenceDate("/api/season-plans/current/advance", referenceDate), {
     method: "POST",
   });
 }

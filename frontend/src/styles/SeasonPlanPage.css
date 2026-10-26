@@ -6,6 +6,130 @@
   gap: 1.5rem;
 }
 
+.season-plan--empty {
+  padding-top: 4.5rem;
+}
+
+.season-plan-create {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(28rem, 1.15fr);
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dce5df;
+  border-radius: 1.2rem;
+}
+
+.season-plan-create__intro {
+  display: flex;
+  padding: clamp(2rem, 5vw, 4rem);
+  justify-content: center;
+  flex-direction: column;
+  color: #ffffff;
+  background: #173f2d;
+}
+
+.season-plan-create__intro .season-plan__eyebrow {
+  color: #edae50;
+}
+
+.season-plan-create__intro h1 {
+  max-width: 9ch;
+  margin: 0;
+  font-size: clamp(2.5rem, 5vw, 4.2rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.season-plan-create__intro > p:last-child {
+  max-width: 30rem;
+  margin: 1.25rem 0 0;
+  color: #c3d5ca;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.season-plan-create__profile {
+  padding: clamp(2rem, 4vw, 3.5rem);
+}
+
+.season-plan-create__profile header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.season-plan-create__profile header div,
+.season-plan-create__profile header span,
+.season-plan-create__profile header strong {
+  display: block;
+}
+
+.season-plan-create__profile header span {
+  color: #637068;
+  font-size: 0.75rem;
+}
+
+.season-plan-create__profile header strong {
+  margin-top: 0.2rem;
+  font-size: 1.35rem;
+}
+
+.season-plan-create__profile header a {
+  color: #27734b;
+  font-weight: 750;
+}
+
+.season-plan-create__profile dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1.5rem 0;
+  gap: 0.65rem;
+}
+
+.season-plan-create__profile dl div {
+  padding: 0.8rem;
+  background: #f2f6f3;
+  border-radius: 0.65rem;
+}
+
+.season-plan-create__profile dt {
+  color: #637068;
+  font-size: 0.72rem;
+}
+
+.season-plan-create__profile dd {
+  margin: 0.25rem 0 0;
+  font-weight: 800;
+}
+
+.season-plan-create__profile > p {
+  color: #637068;
+  line-height: 1.5;
+}
+
+.season-plan-create__profile .season-plan-create__error {
+  color: #9f2f25;
+}
+
+.season-plan-create__profile > button {
+  width: 100%;
+  min-height: 3.2rem;
+  margin-top: 0.75rem;
+  color: #ffffff;
+  background: #27734b;
+  border: 0;
+  border-radius: 0.7rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.season-plan-create__profile > button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .season-plan__header {
   display: flex;
   gap: 2rem;
@@ -217,8 +341,47 @@
 }
 
 @media (max-width: 680px) {
+  .season-plan-create {
+    grid-template-columns: 1fr;
+  }
+
+  .season-plan-create__profile dl {
+    grid-template-columns: 1fr;
+  }
+
   .season-plan__header {
     align-items: stretch;
     flex-direction: column;
   }
+}
+.season-week > a {
+  color: #1f6f49;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.season-plan__history {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.season-plan__history article {
+  display: flex;
+  padding: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #fff;
+  border: 1px solid #dce5df;
+  border-radius: 0.75rem;
+}
+
+.season-plan__history article div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.season-plan__history article a {
+  color: #1f6f49;
+  font-weight: 750;
 }

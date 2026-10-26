@@ -15,10 +15,11 @@ import { LandingPage } from "./pages/LandingPage";
 import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { SeasonPlanPage, } from "./pages/SeasonPlanPage";
+import { SeasonPlanPage } from "./pages/SeasonPlanPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { ProgressPage } from "./pages/ProgressPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
+import { WeekDetailPage } from "./pages/WeekDetailPage";
 import { useCyclistProfile } from "./hooks/useCyclistProfile";
 import "./styles/App.css";
 import { SeasonPlanProvider } from "./context/SeasonPlanProvider";
@@ -94,6 +95,7 @@ function AppRoutes({ auth }: AppRoutesProps) {
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/activities" element={<ActivitiesPage />} />
             <Route path="/plan" element={<SeasonPlanPage />} />
+            <Route path="/plans/:planId/weeks/:weekId" element={<WeekDetailPage />} />
             <Route path="/progress" element={<ProgressPage />} />
           </Route>
           <Route path="/profile" element={<ProfilePage />} />

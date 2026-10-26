@@ -1,16 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { Link } from "react-router-dom";
 import { useSeasonPlan } from "../hooks/useSeasonPlan";
-import { phaseLabels } from "../lib/labels";
-import { recalculateWeekReview } from "../api/seasonPlans";
+import { decisionLabels, phaseLabels, responseLabels } from "../lib/labels";
+import { listPlanAdaptations, recalculateWeekReview, type AdaptationEvent } from "../api/seasonPlans";
 import "../styles/ProgressPage.css";
 
 export function ProgressPage() {
   const { plan, status, error, refresh } = useSeasonPlan();
   const [recalculatingWeek, setRecalculatingWeek] = useState<string | null>(null);
   const [recalculationMessage, setRecalculationMessage] = useState<string | null>(null);
+  const [adaptations, setAdaptations] = useState<AdaptationEvent[]>([]);
   const evaluatedWeeks = plan?.weeks.filter((week) => week.review !== null) ?? [];
+
+  useEffect(() => {
+    if (plan === null) return;
+    void listPlanAdaptations(plan.id).then(setAdaptations).catch(() => setAdaptations([]));
+  }, [plan]);
 
   const plannedTss = evaluatedWeeks.reduce(
     (total, week) =>
@@ -243,11 +250,73 @@ export function ProgressPage() {
                 >
                   {recalculatingWeek === week.id ? "Actualizando…" : "Actualizar revisión"}
                 </button>
+                <Link to={`/plans/${plan?.id}/weeks/${week.id}`}>Ver detalle</Link>
               </article>
             );
           })}
         </div>
       </section>
+
+      {adaptations.length > 0 && (
+        <section className="progress-adaptations">
+          <header>
+            <h2>Historial de adaptaciones</h2>
+            <p>Qué cambió en cada cierre semanal y por qué.</p>
+          </header>
+          <div className="progress-adaptations__list">
+            {adaptations.map((adaptation) => {
+              const sourceWeek = plan?.weeks.find((week) => week.id === adaptation.source_week_id);
+              const targetWeek = plan?.weeks.find((week) => week.id === adaptation.target_week_id);
+              const provisional = adaptation.provisional_target_tss;
+              const requested = targetWeek?.requested_target_tss ?? null;
+              const adapted = adaptation.adapted_target_tss;
+              const difference = provisional !== null && adapted !== null ? adapted - provisional : null;
+              const percentage = difference !== null && provisional !== null && provisional !== 0
+                ? (difference / provisional) * 100
+                : null;
+              return (
+                <article key={adaptation.id}>
+                  <div>
+                    <span>{sourceWeek === undefined ? "Semana revisada" : `Semana del ${format(parseISO(sourceWeek.week_start), "d MMM", { locale: es })}`}</span>
+                    <strong>
+                      {responseLabels[adaptation.response_classification as keyof typeof responseLabels]}
+                      {adaptation.load_decision !== null && ` · ${decisionLabels[adaptation.load_decision as keyof typeof decisionLabels]}`}
+                    </strong>
+                    {sourceWeek?.review !== null && sourceWeek?.review !== undefined && (
+                      <p>
+                        Se registraron {sourceWeek.review.registered_tss.toFixed(0)} de {sourceWeek.review.planned_tss.toFixed(0)} TSS planificados.
+                      </p>
+                    )}
+                    <small>
+                      {adaptation.observed_aerobic_decoupling === null ? "Sin desacoplamiento disponible" : `Desacoplamiento registrado: ${adaptation.observed_aerobic_decoupling.toFixed(1)} %`}
+                    </small>
+                  </div>
+                  <div className="progress-adaptations__change">
+                    <span>Semana siguiente</span>
+                    {difference === null ? <strong>Fin del plan</strong> : (
+                      <dl>
+                        <div><dt>Previsión de temporada</dt><dd>{provisional?.toFixed(0) ?? "—"} TSS</dd></div>
+                        <div><dt>Objetivo tras la revisión</dt><dd>{requested?.toFixed(0) ?? "—"} TSS</dd></div>
+                        <div><dt>Plan factible generado</dt><dd>{adapted?.toFixed(0) ?? "—"} TSS</dd></div>
+                      </dl>
+                    )}
+                    {difference !== null && (
+                      <small>
+                        La previsión cambia {difference >= 0 ? "+" : ""}{difference.toFixed(0)} TSS
+                        {percentage !== null && ` (${percentage >= 0 ? "+" : ""}${percentage.toFixed(1)} %)`}.
+                        {requested !== null && adapted !== null && Math.abs(requested - adapted) > 0.01
+                          ? ` La disponibilidad ajusta el objetivo solicitado en ${(adapted - requested).toFixed(0)} TSS.`
+                          : " El objetivo solicitado cabe en la disponibilidad del ciclista."}
+                      </small>
+                    )}
+                    {targetWeek !== undefined && <Link to={`/plans/${plan?.id}/weeks/${targetWeek.id}`}>Ver semana adaptada</Link>}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="progress-responses">
         <header>

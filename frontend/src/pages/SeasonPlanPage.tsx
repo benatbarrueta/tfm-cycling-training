@@ -1,11 +1,15 @@
+import { useEffect, useState } from "react";
 import {
   differenceInCalendarWeeks,
   format,
   parseISO,
 } from "date-fns";
 import { es } from "date-fns/locale";
+import { Link } from "react-router-dom";
 import { WeeklyPlan } from "../components/WeeklyPlan";
+import { useCyclistProfile } from "../hooks/useCyclistProfile";
 import { useSeasonPlan } from "../hooks/useSeasonPlan";
+import { listSeasonPlans, type SeasonPlan } from "../api/seasonPlans";
 import type { AerobicResponse, TrainingPlan, WeekDay } from "../types/training";
 import { getCurrentDate, getTodayInTimeZone, getWeekLabel, getWeekTemporalState } from "../lib/temporal";
 import "../styles/SeasonPlanPage.css";
@@ -19,6 +23,14 @@ const phaseLabels = {
 
 export function SeasonPlanPage() {
   const { plan: seasonPlan, status, error, create, refresh } = useSeasonPlan();
+  const { profile } = useCyclistProfile();
+  const [plans, setPlans] = useState<SeasonPlan[]>([]);
+  const [createStatus, setCreateStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void listSeasonPlans().then(setPlans).catch(() => setPlans([]));
+  }, [seasonPlan]);
   if (status === "loading") return <main className="season-plan"><p>Cargando planificación...</p></main>;
   if (status === "error") {
     return (
@@ -29,12 +41,68 @@ export function SeasonPlanPage() {
     );
   }
   if (seasonPlan === null) {
+    async function createFirstPlan() {
+      setCreateStatus("loading");
+      setCreateError(null);
+      try {
+        await create("Plan de temporada");
+      } catch (cause) {
+        setCreateStatus("error");
+        setCreateError(cause instanceof Error ? cause.message : "No se ha podido crear la planificación.");
+      }
+    }
+
     return (
-      <main className="season-plan">
-        <p>Aún no tienes un plan de temporada.</p>
-        <button type="button" onClick={() => void create("Plan de temporada")}>
-          Crear mi planificación
-        </button>
+      <main className="season-plan season-plan--empty">
+        <section className="season-plan-create">
+          <div className="season-plan-create__intro">
+            <p className="season-plan__eyebrow">Nueva planificación</p>
+            <h1>Construye tu temporada</h1>
+            <p>
+              Utilizaremos los datos de tu perfil para distribuir la carga y preparar
+              la primera semana de entrenamientos.
+            </p>
+          </div>
+
+          <div className="season-plan-create__profile">
+            <header>
+              <div><span>Datos de partida</span><strong>Tu perfil ciclista</strong></div>
+              <Link to="/profile">Editar perfil</Link>
+            </header>
+            <dl>
+              <div><dt>FTP</dt><dd>{profile?.ftp ?? "—"} W</dd></div>
+              <div><dt>Disponibilidad</dt><dd>{profile?.weekly_hours ?? "—"} h/semana</dd></div>
+              <div><dt>Días de entrenamiento</dt><dd>{profile?.available_days.length ?? "—"}</dd></div>
+              <div><dt>Modalidad</dt><dd>{profile?.modality ?? "—"}</dd></div>
+              <div><dt>Nivel</dt><dd>{profile?.level ?? "—"}</dd></div>
+              <div><dt>Objetivo</dt><dd>{profile?.objective ?? "—"}</dd></div>
+            </dl>
+            <p>
+              Las semanas futuras serán provisionales. Veloform concretará la semana
+              activa y revisará la siguiente con tus actividades reales.
+            </p>
+            {createError !== null && <p className="season-plan-create__error" role="alert">{createError}</p>}
+            <button
+              type="button"
+              disabled={createStatus === "loading"}
+              onClick={() => void createFirstPlan()}
+            >
+              {createStatus === "loading" ? "Generando temporada…" : "Generar mi plan de temporada"}
+            </button>
+          </div>
+        </section>
+        {plans.length > 0 && (
+          <section className="season-plan__history">
+            <h2>Temporadas anteriores</h2>
+            {plans.map((plan) => (
+              <article key={plan.id}>
+                <div><strong>{plan.name}</strong><span>{plan.start_date} – {plan.target_date}</span></div>
+                <span>{plan.status}</span>
+                {plan.weeks.length > 0 && <Link to={`/plans/${plan.id}/weeks/${plan.weeks.at(-1)?.id}`}>Ver última semana</Link>}
+              </article>
+            ))}
+          </section>
+        )}
       </main>
     );
   }
@@ -205,6 +273,8 @@ export function SeasonPlanPage() {
                     {phaseLabels[week.phase as keyof typeof phaseLabels]}
                   </small>
 
+                  <Link to={`/plans/${seasonPlan.id}/weeks/${week.id}`}>Ver detalle</Link>
+
                 </article>
               );
             })}
@@ -214,6 +284,18 @@ export function SeasonPlanPage() {
       </main>
 
       {activeTrainingPlan && <WeeklyPlan plan={activeTrainingPlan} />}
+      {plans.some((plan) => plan.id !== seasonPlan.id) && (
+        <section className="season-plan season-plan__history">
+          <h2>Temporadas anteriores</h2>
+          {plans.filter((plan) => plan.id !== seasonPlan.id).map((plan) => (
+            <article key={plan.id}>
+              <div><strong>{plan.name}</strong><span>{plan.start_date} – {plan.target_date}</span></div>
+              <span>{plan.status}</span>
+              {plan.weeks.length > 0 && <Link to={`/plans/${plan.id}/weeks/${plan.weeks.at(-1)?.id}`}>Ver última semana</Link>}
+            </article>
+          ))}
+        </section>
+      )}
     </>
   );
 }

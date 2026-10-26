@@ -115,6 +115,25 @@ class AdvanceSeasonPlanRead(BaseModel):
     active_week: PlannedWeekRead | None
 
 
+class WeeklyReviewPreviewRead(BaseModel):
+    week_id: UUID
+    week_start: date
+    week_end: date
+    planned_tss: float
+    registered_tss: float
+    planned_duration_minutes: float
+    registered_duration_minutes: float
+    planned_workout_count: int
+    completed_workout_count: int
+    activity_count: int
+    activities_with_tss: int
+    activities_without_tss: int
+    response_median: float | None
+    response_count: int
+    activities_without_response: int
+    pending_overdue_weeks: int
+
+
 class TrainingPhaseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID

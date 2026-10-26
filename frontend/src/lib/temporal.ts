@@ -3,7 +3,25 @@ import { formatInTimeZone } from "./timezone";
 
 export type WeekTemporalState = "UPCOMING" | "CURRENT" | "PAST";
 
+const SIMULATED_DATE_KEY = "veloform.development.referenceDate";
+
+export function getSimulatedDate(): string | null {
+  if (!import.meta.env.DEV || typeof window === "undefined") return null;
+  return window.localStorage.getItem(SIMULATED_DATE_KEY);
+}
+
+export function setSimulatedDate(value: string | null): void {
+  if (!import.meta.env.DEV || typeof window === "undefined") return;
+  if (value === null || value === "") {
+    window.localStorage.removeItem(SIMULATED_DATE_KEY);
+  } else {
+    window.localStorage.setItem(SIMULATED_DATE_KEY, value);
+  }
+}
+
 export function getCurrentDate(): Date {
+  const simulatedDate = getSimulatedDate();
+  if (simulatedDate !== null) return new Date(`${simulatedDate}T12:00:00`);
   return new Date();
 }
 

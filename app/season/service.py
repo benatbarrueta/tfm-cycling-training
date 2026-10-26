@@ -175,6 +175,35 @@ def get_plan(db: Session, user_id: UUID, plan_id: UUID | None = None):
     return db.scalar(query)
 
 
+def list_plans(db: Session, user_id: UUID) -> list[SeasonPlan]:
+    return list(
+        db.scalars(
+            select(SeasonPlan)
+            .options(
+                selectinload(SeasonPlan.phases),
+                selectinload(SeasonPlan.weeks).selectinload(PlannedWeek.training_phase),
+                selectinload(SeasonPlan.weeks).selectinload(PlannedWeek.workouts),
+                selectinload(SeasonPlan.weeks).selectinload(PlannedWeek.review),
+            )
+            .where(SeasonPlan.user_id == user_id)
+            .order_by(SeasonPlan.created_at.desc())
+        )
+    )
+
+
+def list_adaptations(db: Session, user_id: UUID, plan_id: UUID) -> list[AdaptationEvent]:
+    plan = get_plan(db, user_id, plan_id)
+    if plan is None:
+        raise LookupError("Plan no encontrado.")
+    return list(
+        db.scalars(
+            select(AdaptationEvent)
+            .where(AdaptationEvent.season_plan_id == plan.id)
+            .order_by(AdaptationEvent.created_at.desc())
+        )
+    )
+
+
 def _utc_week_bounds(week: PlannedWeek, timezone_name: str) -> tuple[datetime, datetime]:
     zone = ZoneInfo(timezone_name)
     local_start = datetime.combine(week.week_start, time.min, tzinfo=zone)
@@ -183,6 +212,62 @@ def _utc_week_bounds(week: PlannedWeek, timezone_name: str) -> tuple[datetime, d
         local_start.astimezone(timezone.utc).replace(tzinfo=None),
         local_end.astimezone(timezone.utc).replace(tzinfo=None),
     )
+
+
+def preview_week_review(
+    db: Session,
+    user_id: UUID,
+    profile: CyclistProfile,
+    reference: date | None = None,
+) -> dict:
+    plan = get_plan(db, user_id)
+    if plan is None:
+        raise LookupError("No hay un plan activo.")
+    today = reference or date.today()
+    overdue = sorted(
+        [week for week in plan.weeks if week.status == "ACTIVE" and week.week_end < today],
+        key=lambda item: item.position,
+    )
+    if not overdue:
+        raise ValueError("No hay semanas terminadas pendientes de revisión.")
+    week = overdue[0]
+    utc_start, utc_end = _utc_week_bounds(week, profile.timezone)
+    activities = list(
+        db.scalars(
+            select(ActivityRecord).where(
+                ActivityRecord.user_id == user_id,
+                ActivityRecord.started_at >= utc_start,
+                ActivityRecord.started_at < utc_end,
+            )
+        )
+    )
+    summary = summarize_completed_week(week, activities)
+    return {
+        "week_id": week.id,
+        "week_start": week.week_start,
+        "week_end": week.week_end,
+        "planned_tss": summary.planned_tss,
+        "registered_tss": summary.registered_tss,
+        "planned_duration_minutes": summary.planned_duration_minutes,
+        "registered_duration_minutes": summary.registered_duration_minutes,
+        "planned_workout_count": summary.planned_workout_count,
+        "completed_workout_count": summary.linked_workout_count,
+        "activity_count": summary.completed_activity_count,
+        "activities_with_tss": summary.activities_with_tss,
+        "activities_without_tss": summary.activities_without_tss,
+        "response_median": summary.median_aerobic_decoupling,
+        "response_count": summary.responses_available,
+        "activities_without_response": (
+            summary.completed_activity_count - summary.responses_available
+        ),
+        "pending_overdue_weeks": len([
+            candidate
+            for candidate in plan.weeks
+            if candidate.position >= week.position
+            and candidate.status in {"ACTIVE", "PROVISIONAL"}
+            and candidate.week_end < today
+        ]),
+    }
 
 
 def _generate_week(
@@ -242,6 +327,9 @@ def _decision_reason(
     load_decision: str | None,
     registered_tss: float,
     planned_tss: float,
+    provisional_target_tss: float | None,
+    requested_target_tss: float | None,
+    adapted_target_tss: float | None,
 ) -> str:
     response_text = {
         "ELEVATED": "La respuesta aeróbica registrada fue elevada",
@@ -249,15 +337,30 @@ def _decision_reason(
         "UNKNOWN": "No hubo suficientes datos de respuesta aeróbica",
     }[response_classification]
     decision_text = {
-        "INCREASE": "se aumenta la carga",
-        "REDUCE": "se reduce la carga",
-        "MAINTAIN": "se mantiene la carga",
-        None: "se conserva la progresión prevista",
+        "INCREASE": "la decisión semanal es aumentar la carga",
+        "REDUCE": "la decisión semanal es reducir la carga",
+        "MAINTAIN": "la decisión semanal es mantener la carga de referencia",
+        None: "todavía no hay datos suficientes para una decisión semanal de carga",
     }[load_decision]
-    return (
+    reason = (
         f"{response_text}; {decision_text}. "
         f"Se registraron {registered_tss:.1f} de {planned_tss:.1f} TSS planificados."
     )
+    if provisional_target_tss is not None and requested_target_tss is not None:
+        reason += (
+            f" La previsión de temporada era {provisional_target_tss:.1f} TSS "
+            f"y la revisión solicitó {requested_target_tss:.1f} TSS."
+        )
+    if (
+        requested_target_tss is not None
+        and adapted_target_tss is not None
+        and abs(requested_target_tss - adapted_target_tss) > 0.01
+    ):
+        reason += (
+            f" Las restricciones de disponibilidad dejaron un objetivo factible "
+            f"de {adapted_target_tss:.1f} TSS."
+        )
+    return reason
 
 
 def advance_plan(
@@ -347,6 +450,9 @@ def advance_plan(
         load_decision,
         completion.registered_tss,
         completion.planned_tss,
+        provisional_target,
+        generated_summary["requested_target_tss"] if generated_summary else None,
+        adapted_target,
     )
 
     review = WeeklyReview(

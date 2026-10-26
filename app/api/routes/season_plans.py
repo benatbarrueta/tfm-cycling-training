@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,11 +11,21 @@ from app.database.session import get_db
 from app.profile.repository import get_profile
 from app.season.schemas import (
     AdvanceSeasonPlanRead,
+    AdaptationEventRead,
     SeasonPlanCreate,
     SeasonPlanRead,
     WeeklyReviewRead,
+    WeeklyReviewPreviewRead,
 )
-from app.season.service import advance_plan, create_plan, get_plan, recalculate_week_review
+from app.season.service import (
+    advance_plan,
+    create_plan,
+    get_plan,
+    list_adaptations,
+    list_plans,
+    preview_week_review,
+    recalculate_week_review,
+)
 
 router = APIRouter(prefix="/season-plans")
 
@@ -46,17 +57,48 @@ def current_plan(user: User = Depends(get_current_user), db: Session = Depends(g
     return plan
 
 
-@router.post("/current/advance", response_model=AdvanceSeasonPlanRead)
-def advance_current_plan(
+@router.get("", response_model=list[SeasonPlanRead])
+def read_plans(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[SeasonPlanRead]:
+    return list_plans(db, user.id)
+
+
+@router.get("/current/weekly-review-preview", response_model=WeeklyReviewPreviewRead)
+def current_week_review_preview(
+    reference_date: date | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> AdvanceSeasonPlanRead:
+) -> WeeklyReviewPreviewRead:
+    if reference_date is not None and settings.app_env != "development":
+        raise HTTPException(status_code=404, detail="Recurso no encontrado.")
     profile = get_profile(db, user.id)
     if profile is None:
         raise HTTPException(status_code=422, detail="Completa el perfil ciclista.")
     try:
-        return advance_plan(db, user, profile, settings)
+        return preview_week_review(db, user.id, profile, reference=reference_date)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/current/advance", response_model=AdvanceSeasonPlanRead)
+def advance_current_plan(
+    reference_date: date | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> AdvanceSeasonPlanRead:
+    if reference_date is not None and settings.app_env != "development":
+        raise HTTPException(status_code=404, detail="Recurso no encontrado.")
+    profile = get_profile(db, user.id)
+    if profile is None:
+        raise HTTPException(status_code=422, detail="Completa el perfil ciclista.")
+    try:
+        return advance_plan(db, user, profile, settings, reference=reference_date)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -90,3 +132,15 @@ def read_plan(plan_id: UUID, user: User = Depends(get_current_user), db: Session
     if plan is None:
         raise HTTPException(status_code=404, detail="Plan no encontrado.")
     return plan
+
+
+@router.get("/{plan_id}/adaptations", response_model=list[AdaptationEventRead])
+def read_adaptations(
+    plan_id: UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[AdaptationEventRead]:
+    try:
+        return list_adaptations(db, user.id, plan_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
