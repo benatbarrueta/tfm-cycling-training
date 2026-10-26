@@ -115,8 +115,7 @@ npm run dev
 Vite hace proxy de `/api` hacia `http://localhost:8000`, por lo que las
 peticiones conservan la cookie de sesión sin configurar CORS adicional en el
 navegador. La interfaz consulta `/api/auth/me` al arrancar y no guarda sesiones
-ni tokens en `localStorage`; únicamente conserva allí los datos simulados de
-perfil y actividades.
+ni tokens en `localStorage`.
 
 Para activar Google, crea un cliente OAuth de tipo aplicación web en Google
 Cloud Console y añade `http://localhost:5173` como origen autorizado. Copia el
@@ -147,6 +146,8 @@ actividad pertenece al usuario autenticado y se gestiona mediante:
 - `POST /api/activities` para registrar una actividad manual.
 - `GET /api/activities/{id}` para consultar el detalle.
 - `PUT /api/activities/{id}` para editarla.
+- `GET /api/activities/planned-workouts/available?date=YYYY-MM-DD` para
+  consultar las sesiones que se pueden asociar en un día.
 - `PUT /api/activities/{id}/planned-workout` para vincularla o desvincularla
   de una sesión planificada del mismo día.
 - `DELETE /api/activities/{id}` para eliminarla.
@@ -156,6 +157,12 @@ Las métricas restantes son opcionales. El backend normaliza `started_at` a
 UTC y devuelve ISO 8601; el formulario web convierte correctamente el valor
 `datetime-local` del navegador antes de enviarlo. La API limita las listas a
 100 elementos y ordena las actividades de más reciente a más antigua.
+
+El formulario propone automáticamente una sesión cuando solo existe una
+opción disponible en esa fecha. El usuario también puede registrar una
+actividad adicional. Cada sesión planificada admite una sola actividad
+vinculada, y la API verifica que ambas pertenecen al mismo día según la zona
+horaria del perfil.
 
 La tabla `activities` se crea con:
 

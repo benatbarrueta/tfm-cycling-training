@@ -256,7 +256,12 @@ export function DashboardPage() {
               <p>Quedan {reviewPreview.pending_overdue_weeks} semanas vencidas y se revisarán en orden.</p>
             )}
             <footer>
-              <Link to={`/calendar?view=week&date=${reviewPreview.week_start}`}>Volver al calendario</Link>
+              <Link
+                className="dashboard__review-calendar-link"
+                to={`/calendar?view=week&date=${reviewPreview.week_start}`}
+              >
+                Volver al calendario
+              </Link>
               <button type="button" disabled={advanceStatus === "loading"} onClick={() => void closeWeek()}>
                 {advanceStatus === "loading" ? "Cerrando…" : "Cerrar semana y generar la siguiente"}
               </button>

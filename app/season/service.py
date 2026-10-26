@@ -34,9 +34,9 @@ GENERATOR_VERSION = "deterministic-season-v1"
 ADAPTATION_RULE_VERSION = "weekly-review-v1"
 
 
-def next_monday(reference: date) -> date:
+def monday_on_or_after(reference: date) -> date:
     days_until_monday = (7 - reference.weekday()) % 7
-    return reference + timedelta(days=days_until_monday or 7)
+    return reference + timedelta(days=days_until_monday)
 
 
 def phase_distribution(weeks: int) -> list[int]:
@@ -92,7 +92,7 @@ def create_plan(db: Session, user: User, profile: CyclistProfile, name: str, set
     if profile.target_date is None:
         raise ValueError("El perfil debe tener una fecha objetivo para crear el plan.")
     today = reference or date.today()
-    start = next_monday(today)
+    start = monday_on_or_after(today)
     last_start = profile.target_date - timedelta(days=profile.target_date.weekday())
     weeks_count = ((last_start - start).days // 7) + 1
     counts = phase_distribution(weeks_count)

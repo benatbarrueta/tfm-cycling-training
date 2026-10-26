@@ -39,6 +39,17 @@ export interface ActivityFilters {
   offset?: number;
 }
 
+export interface AvailablePlannedWorkout {
+  id: string;
+  scheduled_date: string;
+  workout_type: string;
+  duration_minutes: number | null;
+  estimated_tss: number | null;
+  target_tss: number;
+  already_linked: boolean;
+  linked_activity_id: string | null;
+}
+
 export function listActivities(filters: ActivityFilters = {}) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
@@ -50,6 +61,12 @@ export function listActivities(filters: ActivityFilters = {}) {
 
 export function getActivity(id: string) {
   return apiRequest<Activity>(`/api/activities/${id}`);
+}
+
+export function listAvailablePlannedWorkouts(date: string) {
+  return apiRequest<AvailablePlannedWorkout[]>(
+    `/api/activities/planned-workouts/available?date=${encodeURIComponent(date)}`,
+  );
 }
 
 export function createActivity(input: ActivityInput) {

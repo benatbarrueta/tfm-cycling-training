@@ -80,6 +80,7 @@ class ActivityRecord(Base):
         Uuid,
         ForeignKey("planned_workouts.id", ondelete="SET NULL"),
         nullable=True,
+        unique=True,
         index=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)

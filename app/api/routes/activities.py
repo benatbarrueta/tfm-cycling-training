@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.activities import repository, service
 from app.activities.schemas import (
     ActivityCreate,
+    AvailableWorkoutRead,
     ActivityListResponse,
     ActivityRead,
     ActivityUpdate,
@@ -49,6 +50,15 @@ def create_activity(payload: ActivityCreate, user: User = Depends(get_current_us
     return service.create(db, user.id, payload)
 
 
+@router.get("/planned-workouts/available", response_model=list[AvailableWorkoutRead])
+def available_planned_workouts(
+    date_value: date = Query(alias="date"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[AvailableWorkoutRead]:
+    return service.available_workouts(db, user.id, date_value)
+
+
 @router.get("/{activity_id}", response_model=ActivityRead)
 def get_activity(activity_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ActivityRead:
     activity = repository.get_by_id_for_user(db, activity_id, user.id)
@@ -59,7 +69,18 @@ def get_activity(activity_id: UUID, user: User = Depends(get_current_user), db: 
 
 @router.put("/{activity_id}", response_model=ActivityRead)
 def update_activity(activity_id: UUID, payload: ActivityUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ActivityRead:
-    activity = service.update(db, user.id, activity_id, payload)
+    profile = get_profile(db, user.id)
+    timezone_name = profile.timezone if profile is not None else "UTC"
+    try:
+        activity = service.update(
+            db,
+            user.id,
+            activity_id,
+            payload,
+            timezone_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if activity is None:
         raise HTTPException(status_code=404, detail="Activity not found")
     return activity

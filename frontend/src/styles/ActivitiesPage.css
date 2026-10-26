@@ -241,3 +241,18 @@
     grid-template-columns: 1fr;
   }
 }
+.activities-page__link-status {
+  display: inline-block;
+  padding: 0.3rem 0.5rem;
+  color: #21613f;
+  background: #e4f3e9;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.activities-page__link-status--extra {
+  color: #637068;
+  background: #eef1ef;
+}

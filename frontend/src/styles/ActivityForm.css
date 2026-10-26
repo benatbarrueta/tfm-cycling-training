@@ -51,7 +51,9 @@
   font-weight: 700;
 }
 
-.activity-form__field input {
+.activity-form__field input,
+.activity-form__field select,
+.activity-form__field textarea {
   width: 100%;
   min-height: 2.8rem;
   padding: 0.65rem 0.75rem;
@@ -62,10 +64,20 @@
   outline: none;
 }
 
-.activity-form__field input:focus {
+.activity-form__field input:focus,
+.activity-form__field select:focus,
+.activity-form__field textarea:focus {
   background: #ffffff;
   border-color: #2e8b57;
   box-shadow: 0 0 0 3px rgb(46 139 87 / 15%);
+}
+
+.activity-form__field--full {
+  grid-column: 1 / -1;
+}
+
+.activity-form__field .activity-form__hint {
+  color: #637068;
 }
 
 .activity-form__field small {

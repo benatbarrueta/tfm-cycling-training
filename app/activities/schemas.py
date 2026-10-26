@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from uuid import UUID
 
@@ -85,3 +85,14 @@ class ActivityWorkoutLink(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     planned_workout_id: UUID | None
+
+
+class AvailableWorkoutRead(BaseModel):
+    id: UUID
+    scheduled_date: date
+    workout_type: str
+    duration_minutes: int | None
+    estimated_tss: float | None
+    target_tss: float
+    already_linked: bool
+    linked_activity_id: UUID | None

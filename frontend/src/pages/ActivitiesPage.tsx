@@ -15,7 +15,7 @@ function metric(value: number | null, suffix = "") {
 }
 
 export function ActivitiesPage() {
-  const { activities, total, status, error, refresh, addActivity, editActivity, removeActivity } = useActivities({ limit: 50 });
+  const { activities, total, status, error, refresh, addActivity, editActivity, removeActivity, linkActivity } = useActivities({ limit: 50 });
   const [editing, setEditing] = useState<Activity | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -49,12 +49,24 @@ export function ActivitiesPage() {
       {(showForm || editing) && (
         <ActivityForm
           initialValues={editing ? { ...editing, started_at: localDateTime(editing.started_at) } : undefined}
+          initialPlannedWorkoutId={editing?.planned_workout_id}
+          activityId={editing?.id}
           submitLabel={editing ? "Editar actividad" : "Guardar actividad"}
           onCancel={() => { setShowForm(false); setEditing(null); }}
-          onSubmit={async (input) => {
+          onSubmit={async (input, plannedWorkoutId) => {
             try {
-              if (editing) await editActivity(editing.id, input);
-              else await addActivity(input);
+              if (editing) {
+                if (editing.planned_workout_id !== plannedWorkoutId && editing.planned_workout_id !== null) {
+                  await linkActivity(editing.id, null);
+                }
+                const updated = await editActivity(editing.id, input);
+                if (updated.planned_workout_id !== plannedWorkoutId) {
+                  await linkActivity(updated.id, plannedWorkoutId);
+                }
+              } else {
+                const created = await addActivity(input);
+                if (plannedWorkoutId !== null) await linkActivity(created.id, plannedWorkoutId);
+              }
               setShowForm(false); setEditing(null); setFormError(null);
               setMessage(editing ? "Actividad actualizada." : "Actividad guardada.");
             } catch (cause) {
@@ -72,7 +84,7 @@ export function ActivitiesPage() {
         {status === "empty" && <div className="activities-page__empty"><strong>No hay actividades registradas</strong><p>Utiliza el formulario superior para añadir tu primer entrenamiento.</p></div>}
         {status === "ready" && (
           <div className="activities-page__table-wrapper">
-            <table className="activities-page__table"><thead><tr><th>Actividad</th><th>Fecha</th><th>Duración</th><th>Distancia</th><th>Potencia</th><th>FC</th><th>TSS</th><th>Acciones</th></tr></thead>
+            <table className="activities-page__table"><thead><tr><th>Actividad</th><th>Fecha</th><th>Duración</th><th>Distancia</th><th>Potencia</th><th>FC</th><th>TSS</th><th>Sesión</th><th>Acciones</th></tr></thead>
               <tbody>{activities.map((activity) => <tr key={activity.id}>
                 <td>
                   <strong className="activities-page__activity-title">{activity.title}</strong>
@@ -82,6 +94,7 @@ export function ActivitiesPage() {
                 </td>
                 <td>{new Date(activity.started_at).toLocaleString("es-ES")}</td>
                 <td>{metric(activity.duration_minutes, " min")}</td><td>{metric(activity.distance_km, " km")}</td><td>{metric(activity.average_power, " W")}</td><td>{metric(activity.average_heart_rate, " ppm")}</td><td>{metric(activity.tss)}</td>
+                <td><span className={activity.planned_workout_id === null ? "activities-page__link-status activities-page__link-status--extra" : "activities-page__link-status"}>{activity.planned_workout_id === null ? "Actividad adicional" : "Vinculada"}</span></td>
                 <td className="activities-page__actions">
                   <button
                     className="activities-page__edit"

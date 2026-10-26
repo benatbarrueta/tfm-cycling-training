@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
+from app.activities.service import available_workouts, link_to_workout
 from app.core.config import Settings
 from app.database.base import Base
 from app.database.models import (
@@ -21,6 +22,7 @@ from app.database.models import (
 from app.season.service import (
     advance_plan,
     list_adaptations,
+    monday_on_or_after,
     preview_week_review,
     recalculate_week_review,
 )
@@ -50,6 +52,18 @@ def build_week() -> tuple[PlannedWeek, PlannedWorkout]:
     )
     week.workouts = [workout]
     return week, workout
+
+
+@pytest.mark.parametrize(
+    ("reference", "expected"),
+    [
+        (date(2026, 10, 26), date(2026, 10, 26)),
+        (date(2026, 10, 27), date(2026, 11, 2)),
+        (date(2026, 11, 1), date(2026, 11, 2)),
+    ],
+)
+def test_training_week_starts_on_current_or_next_monday(reference, expected):
+    assert monday_on_or_after(reference) == expected
 
 
 def test_weekly_summary_counts_all_load_and_only_linked_adherence():
@@ -211,3 +225,32 @@ def test_advance_plan_is_transactional_and_idempotent():
         assert corrected.registered_tss == pytest.approx(85)
         assert corrected.response_median == pytest.approx(6)
         assert db.scalar(select(func.count()).select_from(AdaptationEvent)) == 1
+
+        options = available_workouts(db, user.id, workout.scheduled_date)
+        assert len(options) == 1
+        assert options[0]["already_linked"] is True
+        assert options[0]["linked_activity_id"] == activity.id
+
+        extra_activity = ActivityRecord(
+            user_id=user.id,
+            title="Otra salida",
+            started_at=datetime(2026, 10, 6, 10),
+            sport="CYCLING",
+            duration_minutes=30,
+            tss=20,
+            source="MANUAL",
+        )
+        db.add(extra_activity)
+        db.commit()
+
+        with pytest.raises(
+            ValueError,
+            match="ya está vinculada",
+        ):
+            link_to_workout(
+                db,
+                user.id,
+                extra_activity.id,
+                workout.id,
+                profile.timezone,
+            )

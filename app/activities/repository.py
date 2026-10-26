@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
@@ -38,6 +38,38 @@ def get_workout_for_user(
             SeasonPlan.user_id == user_id,
         )
     )
+
+
+def list_workouts_for_user_on_date(
+    db: Session,
+    user_id: UUID,
+    scheduled_date: date,
+) -> list[tuple[PlannedWorkout, UUID | None]]:
+    rows = db.execute(
+        select(PlannedWorkout, ActivityRecord.id)
+        .join(PlannedWeek)
+        .join(SeasonPlan)
+        .outerjoin(ActivityRecord, ActivityRecord.planned_workout_id == PlannedWorkout.id)
+        .where(
+            SeasonPlan.user_id == user_id,
+            PlannedWorkout.scheduled_date == scheduled_date,
+        )
+        .order_by(PlannedWorkout.position)
+    ).all()
+    return [(workout, activity_id) for workout, activity_id in rows]
+
+
+def get_activity_linked_to_workout(
+    db: Session,
+    planned_workout_id: UUID,
+    excluding_activity_id: UUID | None = None,
+) -> ActivityRecord | None:
+    query = select(ActivityRecord).where(
+        ActivityRecord.planned_workout_id == planned_workout_id,
+    )
+    if excluding_activity_id is not None:
+        query = query.where(ActivityRecord.id != excluding_activity_id)
+    return db.scalar(query)
 
 
 def create_for_user(db: Session, user_id: UUID, data: dict) -> ActivityRecord:

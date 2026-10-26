@@ -1,12 +1,21 @@
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { activitySchema, type ActivityFormInput, type ActivityFormValues } from "../schemas/activitySchema";
-import type { ActivityInput } from "../api/activities";
+import {
+  listAvailablePlannedWorkouts,
+  type ActivityInput,
+  type AvailablePlannedWorkout,
+} from "../api/activities";
+import { workoutLabels } from "../lib/labels";
+import type { WorkoutType } from "../types/training";
 import "../styles/ActivityForm.css";
 
 interface ActivityFormProps {
   initialValues?: Partial<ActivityFormValues>;
-  onSubmit: (activity: ActivityInput) => Promise<void>;
+  initialPlannedWorkoutId?: string | null;
+  activityId?: string;
+  onSubmit: (activity: ActivityInput, plannedWorkoutId: string | null) => Promise<void>;
   onCancel?: () => void;
   submitLabel?: string;
 }
@@ -19,8 +28,8 @@ function valueOrNull(value: number | null): number | null {
   return value === null || Number.isNaN(value) ? null : value;
 }
 
-export function ActivityForm({ initialValues, onSubmit, onCancel, submitLabel = "Guardar actividad" }: ActivityFormProps) {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ActivityFormInput, unknown, ActivityFormValues>({
+export function ActivityForm({ initialValues, initialPlannedWorkoutId = null, activityId, onSubmit, onCancel, submitLabel = "Guardar actividad" }: ActivityFormProps) {
+  const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<ActivityFormInput, unknown, ActivityFormValues>({
     resolver: zodResolver(activitySchema),
     defaultValues: {
       title: initialValues?.title ?? "",
@@ -36,6 +45,37 @@ export function ActivityForm({ initialValues, onSubmit, onCancel, submitLabel = 
       notes: initialValues?.notes ?? "",
     },
   });
+  const startedAt = useWatch({ control, name: "started_at" });
+  const [workouts, setWorkouts] = useState<AvailablePlannedWorkout[]>([]);
+  const [plannedWorkoutId, setPlannedWorkoutId] = useState(initialPlannedWorkoutId ?? "");
+  const [workoutStatus, setWorkoutStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    const activityDate = typeof startedAt === "string" ? startedAt.slice(0, 10) : "";
+    if (activityDate === "") return;
+    let active = true;
+    void listAvailablePlannedWorkouts(activityDate)
+      .then((items) => {
+        if (!active) return;
+        setWorkouts(items);
+        setWorkoutStatus("ready");
+        const selectable = items.filter(
+          (item) => !item.already_linked || item.linked_activity_id === activityId,
+        );
+        setPlannedWorkoutId((current) => {
+          if (selectable.some((item) => item.id === current)) return current;
+          return selectable.length === 1 ? selectable[0].id : "";
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        setWorkouts([]);
+        setWorkoutStatus("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [activityId, startedAt]);
 
   async function submit(values: ActivityFormValues) {
     await onSubmit({
@@ -51,7 +91,7 @@ export function ActivityForm({ initialValues, onSubmit, onCancel, submitLabel = 
       tss: valueOrNull(values.tss),
       aerobic_decoupling: valueOrNull(values.aerobic_decoupling),
       notes: values.notes?.trim() || null,
-    });
+    }, plannedWorkoutId || null);
   }
 
   const fields = [
@@ -73,6 +113,24 @@ export function ActivityForm({ initialValues, onSubmit, onCancel, submitLabel = 
       <div className="activity-form__grid">
         <label className="activity-form__field"><span>Título *</span><input {...register("title")} placeholder="Salida de resistencia" />{errors.title && <small>{errors.title.message}</small>}</label>
         <label className="activity-form__field"><span>Fecha y hora *</span><input type="datetime-local" {...register("started_at")} />{errors.started_at && <small>{errors.started_at.message}</small>}</label>
+        <label className="activity-form__field activity-form__field--full">
+          <span>Sesión planificada</span>
+          <select value={plannedWorkoutId} onChange={(event) => setPlannedWorkoutId(event.target.value)}>
+            <option value="">Actividad adicional / sin sesión</option>
+            {workouts.map((workout) => {
+              const occupiedByAnother = workout.already_linked && workout.linked_activity_id !== activityId;
+              return (
+                <option key={workout.id} value={workout.id} disabled={occupiedByAnother}>
+                  {workoutLabels[workout.workout_type as WorkoutType]} · {workout.duration_minutes ?? "—"} min · {(workout.estimated_tss ?? workout.target_tss).toFixed(0)} TSS{occupiedByAnother ? " · ya vinculada" : ""}
+                </option>
+              );
+            })}
+          </select>
+          {workoutStatus === "ready" && workouts.length === 0 && startedAt && (
+            <small className="activity-form__hint">No hay sesiones planificadas para esta fecha. Se guardará como actividad adicional.</small>
+          )}
+          {workoutStatus === "error" && <small>No se han podido consultar las sesiones planificadas.</small>}
+        </label>
         <label className="activity-form__field"><span>Duración (minutos) *</span><input type="number" min="0.1" step="0.1" {...register("duration_minutes")} />{errors.duration_minutes && <small>{errors.duration_minutes.message}</small>}</label>
         {fields.map(([name, label, type]) => (
           <label className="activity-form__field" key={name}><span>{label}</span><input type={type} step="0.1" min={name === "aerobic_decoupling" ? undefined : "0"} {...register(name)} />{errors[name] && <small>{errors[name]?.message}</small>}</label>
