@@ -54,11 +54,13 @@ export interface WeeklyReview {
   activities_with_tss: number;
   activities_without_tss: number;
   registered_rpe_load: number;
+  median_perceived_exertion: number | null;
   activities_with_rpe_load: number;
   activities_without_load: number;
   response_median: number | null;
   response_count: number;
   load_decision: string | null;
+  adaptation_method: string;
   decision_reason: string | null;
   closed_at: string;
 }
@@ -73,6 +75,7 @@ export interface AdaptationEvent {
   load_decision: string | null;
   observed_aerobic_decoupling: number | null;
   response_classification: string;
+  adaptation_method: string;
   reason: string;
   rule_version: string;
   created_at: string;
@@ -100,6 +103,7 @@ export interface WeeklyReviewPreview {
   activities_with_tss: number;
   activities_without_tss: number;
   registered_rpe_load: number;
+  median_perceived_exertion: number | null;
   activities_with_rpe_load: number;
   activities_without_load: number;
   response_median: number | null;

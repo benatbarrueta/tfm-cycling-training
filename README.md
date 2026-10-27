@@ -192,10 +192,12 @@ el calendario y la vista Evolución consumen la API persistida.
 
 Cuando una actividad no contiene TSS, el usuario puede indicar un esfuerzo
 percibido entre 1 y 10. Veloform calcula `duración × RPE` y lo conserva como
-carga estimada en `RPE·min`. Esta carga sirve para documentar el esfuerzo y
-el cumplimiento, pero se mantiene separada del TSS porque ambas métricas no
-comparten escala. La ausencia de potencia tampoco impide vincular una
-actividad con su sesión planificada ni contabilizar su duración.
+carga estimada en `RPE·min`. Esta carga se mantiene separada del TSS porque
+ambas métricas no comparten escala. Cuando no existe suficiente cobertura de
+TSS, el cierre semanal usa el cumplimiento, la duración y el RPE mediano para
+aplicar una adaptación conservadora, sin convertir RPE a TSS. La ausencia de
+potencia tampoco impide vincular una actividad con su sesión planificada ni
+contabilizar su duración.
 
 ### Cierre y adaptación semanal
 
@@ -728,6 +730,16 @@ La decisión basada en la carga semanal se combina con la respuesta prevista:
 - Si la respuesta es elevada y la carga estaba creciendo, se reduce.
 - Si la respuesta es elevada y la carga estaba estable o descendiendo, se
   mantiene.
+
+El cierre registra también el método utilizado:
+
+- `POWER_TSS`: hay al menos un 50 % de cobertura de TSS y se utiliza el flujo
+  basado en potencia y respuesta aeróbica.
+- `RPE_FALLBACK`: se usa el cumplimiento, la duración y el RPE mediano. Un RPE
+  mediano de 8 o más, o superar la duración prevista en más de un 20 %, reduce
+  el objetivo un 15 %. Un cumplimiento inferior al 60 % impide aumentarlo.
+- `INSUFFICIENT_DATA`: no hay TSS ni RPE suficientes y se mantiene la previsión
+  de temporada.
 
 ### Decisiones posibles
 

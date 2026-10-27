@@ -63,11 +63,13 @@ class WeeklyReviewRead(BaseModel):
     activities_with_tss: int
     activities_without_tss: int
     registered_rpe_load: float
+    median_perceived_exertion: float | None
     activities_with_rpe_load: int
     activities_without_load: int
     response_median: float | None
     response_count: int
     load_decision: str | None
+    adaptation_method: str
     decision_reason: str | None
     closed_at: datetime
 
@@ -105,6 +107,7 @@ class AdaptationEventRead(BaseModel):
     load_decision: str | None
     observed_aerobic_decoupling: float | None
     response_classification: str
+    adaptation_method: str
     reason: str
     rule_version: str
     created_at: datetime
@@ -132,6 +135,7 @@ class WeeklyReviewPreviewRead(BaseModel):
     activities_with_tss: int
     activities_without_tss: int
     registered_rpe_load: float
+    median_perceived_exertion: float | None
     activities_with_rpe_load: int
     activities_without_load: int
     response_median: float | None

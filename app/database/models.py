@@ -241,11 +241,15 @@ class WeeklyReview(Base):
     activities_with_tss: Mapped[int] = mapped_column(Integer, nullable=False)
     activities_without_tss: Mapped[int] = mapped_column(Integer, nullable=False)
     registered_rpe_load: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    median_perceived_exertion: Mapped[float | None] = mapped_column(Float)
     activities_with_rpe_load: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     activities_without_load: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     response_median: Mapped[float | None] = mapped_column(Float)
     response_count: Mapped[int] = mapped_column(Integer, nullable=False)
     load_decision: Mapped[str | None] = mapped_column(String(32))
+    adaptation_method: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="INSUFFICIENT_DATA"
+    )
     decision_reason: Mapped[str | None] = mapped_column(String(1000))
     closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -274,6 +278,9 @@ class AdaptationEvent(Base):
     load_decision: Mapped[str | None] = mapped_column(String(32))
     observed_aerobic_decoupling: Mapped[float | None] = mapped_column(Float)
     response_classification: Mapped[str] = mapped_column(String(32), nullable=False)
+    adaptation_method: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="INSUFFICIENT_DATA"
+    )
     reason: Mapped[str] = mapped_column(String(1000), nullable=False)
     rule_version: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

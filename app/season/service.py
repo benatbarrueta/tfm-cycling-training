@@ -22,16 +22,21 @@ from app.database.models import (
     utc_now,
 )
 from app.models.cyclist import Cyclist, Level, Modality
+from app.models.aerobic_response import AerobicResponse
+from app.models.load_decision import LoadDecision
 from app.models.training_objective import Objective
 from app.services.training_engine_service import generate_personalized_training_plan
 from app.services.aerobic_response_service import classify_aerobic_response
-from app.services.training_plan_service import DAY_ORDER
+from app.services.training_plan_service import DAY_ORDER, generate_feasible_training_plan
 from app.services.training_plan_summary_service import build_training_plan_summary
 from app.season.weekly_review import summarize_completed_week
 
 PHASES = ("BASE", "BUILD", "PEAK", "TAPER")
 GENERATOR_VERSION = "deterministic-season-v1"
-ADAPTATION_RULE_VERSION = "weekly-review-v1"
+ADAPTATION_RULE_VERSION = "weekly-review-v2"
+POWER_TSS = "POWER_TSS"
+RPE_FALLBACK = "RPE_FALLBACK"
+INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 
 
 def monday_on_or_after(reference: date) -> date:
@@ -256,6 +261,7 @@ def preview_week_review(
         "activities_with_tss": summary.activities_with_tss,
         "activities_without_tss": summary.activities_without_tss,
         "registered_rpe_load": summary.registered_rpe_load,
+        "median_perceived_exertion": summary.median_perceived_exertion,
         "activities_with_rpe_load": summary.activities_with_rpe_load,
         "activities_without_load": summary.activities_without_load,
         "response_median": summary.median_aerobic_decoupling,
@@ -325,6 +331,81 @@ def _generate_week(
     return summary
 
 
+def _rpe_adaptation(completion, provisional_target_tss: float) -> tuple[LoadDecision, float]:
+    """Apply a conservative load rule without converting RPE into TSS."""
+    duration_ratio = (
+        completion.registered_duration_minutes / completion.planned_duration_minutes
+        if completion.planned_duration_minutes > 0
+        else 0.0
+    )
+    rpe = completion.median_perceived_exertion
+    if (rpe is not None and rpe >= 8) or duration_ratio > 1.2:
+        return LoadDecision.REDUCE, round(provisional_target_tss * 0.85, 2)
+    if completion.workout_completion_rate < 0.6:
+        return LoadDecision.MAINTAIN, round(
+            min(provisional_target_tss, completion.planned_tss), 2
+        )
+    return LoadDecision.MAINTAIN, round(provisional_target_tss, 2)
+
+
+def _adaptation_method(completion) -> str:
+    if completion.activities_with_tss > 0 and completion.tss_coverage >= 0.5:
+        return POWER_TSS
+    if completion.activities_with_rpe_load > 0:
+        return RPE_FALLBACK
+    return INSUFFICIENT_DATA
+
+
+def _generate_week_for_target(
+    db: Session,
+    profile: CyclistProfile,
+    week: PlannedWeek,
+    requested_target_tss: float,
+    decision: LoadDecision,
+    method: str,
+) -> dict:
+    cyclist = Cyclist(
+        cyclist_id=1,
+        modalities=[Modality(profile.modality)],
+        level=Level(profile.level),
+        ftp=profile.ftp,
+        weekly_hours=profile.weekly_hours,
+        available_days=profile.available_days,
+        objective=Objective(profile.objective),
+        objective_date=profile.target_date,
+    )
+    domain_plan = generate_feasible_training_plan(
+        cyclist=cyclist,
+        modality=Modality(profile.modality),
+        target_tss=requested_target_tss,
+        reference_date=week.week_start,
+    )
+    domain_plan.requested_target_tss = requested_target_tss
+    domain_plan.load_decision = decision
+    domain_plan.aerobic_response = AerobicResponse.UNKNOWN
+    domain_plan.response_prediction_method = method.lower()
+    summary = build_training_plan_summary(domain_plan)
+    week.requested_target_tss = summary["requested_target_tss"]
+    week.adapted_target_tss = summary["target_tss"]
+    week.estimated_total_tss = summary["estimated_total_tss"]
+    week.expected_aerobic_decoupling = None
+    week.response_prediction_method = summary["response_prediction_method"]
+    week.load_decision = summary["load_decision"]
+    week.generated_at = utc_now()
+    week.status = "ACTIVE"
+    week.workouts.clear()
+    db.flush()
+    for position, workout in enumerate(domain_plan.workouts, start=1):
+        scheduled = week.week_start + timedelta(days=DAY_ORDER[workout.day])
+        db.add(
+            PlannedWorkout(
+                planned_week=week,
+                **_workout_data(workout, summary, position, scheduled),
+            )
+        )
+    return summary
+
+
 def _decision_reason(
     response_classification: str,
     load_decision: str | None,
@@ -336,6 +417,8 @@ def _decision_reason(
     provisional_target_tss: float | None,
     requested_target_tss: float | None,
     adapted_target_tss: float | None,
+    adaptation_method: str,
+    median_perceived_exertion: float | None,
 ) -> str:
     response_text = {
         "ELEVATED": "La respuesta aeróbica registrada fue elevada",
@@ -364,7 +447,14 @@ def _decision_reason(
         )
     else:
         load_text = "No se registraron actividades durante la semana."
-    reason = f"{response_text}; {decision_text}. {load_text}"
+    method_text = {
+        POWER_TSS: "La adaptación se calculó con potencia y TSS",
+        RPE_FALLBACK: "La adaptación se calculó con cumplimiento, duración y RPE",
+        INSUFFICIENT_DATA: "La carga provisional se conservó por falta de datos suficientes",
+    }[adaptation_method]
+    if adaptation_method == RPE_FALLBACK and median_perceived_exertion is not None:
+        method_text += f" (RPE mediano {median_perceived_exertion:.1f})"
+    reason = f"{response_text}; {decision_text}. {load_text} {method_text}."
     if provisional_target_tss is not None and requested_target_tss is not None:
         reason += (
             f" La previsión de temporada era {provisional_target_tss:.1f} TSS "
@@ -461,7 +551,19 @@ def advance_plan(
         None,
     )
     provisional_target = next_week.provisional_target_tss if next_week is not None else None
-    generated_summary = _generate_week(db, user, profile, next_week) if next_week else None
+    method = _adaptation_method(completion)
+    generated_summary = None
+    if next_week is not None:
+        if method == POWER_TSS:
+            generated_summary = _generate_week(db, user, profile, next_week)
+        else:
+            decision = LoadDecision.MAINTAIN
+            target = float(provisional_target)
+            if method == RPE_FALLBACK:
+                decision, target = _rpe_adaptation(completion, target)
+            generated_summary = _generate_week_for_target(
+                db, profile, next_week, target, decision, method
+            )
     load_decision = generated_summary["load_decision"] if generated_summary else None
     adapted_target = generated_summary["target_tss"] if generated_summary else None
     reason = _decision_reason(
@@ -475,6 +577,8 @@ def advance_plan(
         provisional_target,
         generated_summary["requested_target_tss"] if generated_summary else None,
         adapted_target,
+        method,
+        completion.median_perceived_exertion,
     )
 
     review = WeeklyReview(
@@ -490,11 +594,13 @@ def advance_plan(
         activities_with_tss=completion.activities_with_tss,
         activities_without_tss=completion.activities_without_tss,
         registered_rpe_load=completion.registered_rpe_load,
+        median_perceived_exertion=completion.median_perceived_exertion,
         activities_with_rpe_load=completion.activities_with_rpe_load,
         activities_without_load=completion.activities_without_load,
         response_median=completion.median_aerobic_decoupling,
         response_count=completion.responses_available,
         load_decision=load_decision,
+        adaptation_method=method,
         decision_reason=reason,
         closed_at=utc_now(),
     )
@@ -508,6 +614,7 @@ def advance_plan(
         load_decision=load_decision,
         observed_aerobic_decoupling=completion.median_aerobic_decoupling,
         response_classification=response,
+        adaptation_method=method,
         reason=reason,
         rule_version=ADAPTATION_RULE_VERSION,
     )
@@ -574,6 +681,7 @@ def recalculate_week_review(
     review.activities_with_tss = completion.activities_with_tss
     review.activities_without_tss = completion.activities_without_tss
     review.registered_rpe_load = completion.registered_rpe_load
+    review.median_perceived_exertion = completion.median_perceived_exertion
     review.activities_with_rpe_load = completion.activities_with_rpe_load
     review.activities_without_load = completion.activities_without_load
     review.response_median = completion.median_aerobic_decoupling

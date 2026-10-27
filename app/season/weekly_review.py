@@ -17,6 +17,7 @@ class WeeklyCompletionSummary:
     activities_without_tss: int
     tss_coverage: float
     registered_rpe_load: float
+    median_perceived_exertion: float | None
     activities_with_rpe_load: int
     activities_without_load: int
     planned_duration_minutes: float
@@ -43,6 +44,11 @@ def summarize_completed_week(
         float(activity.estimated_load)
         for activity in activities
         if activity.tss is None and activity.estimated_load is not None
+    ]
+    perceived_exertions = [
+        float(activity.perceived_exertion)
+        for activity in activities
+        if activity.perceived_exertion is not None
     ]
     responses = [
         float(activity.aerobic_decoupling)
@@ -71,6 +77,9 @@ def summarize_completed_week(
         activities_without_tss=activity_count - len(known_tss),
         tss_coverage=(len(known_tss) / activity_count) if activity_count else 0.0,
         registered_rpe_load=sum(rpe_loads),
+        median_perceived_exertion=(
+            float(median(perceived_exertions)) if perceived_exertions else None
+        ),
         activities_with_rpe_load=len(rpe_loads),
         activities_without_load=(
             activity_count - len(known_tss) - len(rpe_loads)

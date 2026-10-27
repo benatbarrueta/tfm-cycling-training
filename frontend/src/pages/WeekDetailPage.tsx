@@ -67,8 +67,10 @@ export function WeekDetailPage() {
         <section className="week-detail__review">
           <header><h2>Resultado de la semana</h2><p>{week.review.decision_reason}</p></header>
           <dl>
+            <div><dt>Método de adaptación</dt><dd>{week.review.adaptation_method === "POWER_TSS" ? "Potencia y TSS" : week.review.adaptation_method === "RPE_FALLBACK" ? "Cumplimiento, duración y RPE" : "Datos insuficientes"}</dd></div>
             <div><dt>TSS realizado</dt><dd>{week.review.registered_tss.toFixed(0)} / {week.review.planned_tss.toFixed(0)}</dd></div>
             <div><dt>Carga estimada</dt><dd>{week.review.registered_rpe_load.toFixed(0)} RPE·min</dd></div>
+            <div><dt>RPE mediano</dt><dd>{week.review.median_perceived_exertion?.toFixed(1) ?? "Sin datos"}</dd></div>
             <div><dt>Sesiones vinculadas</dt><dd>{week.review.completed_workout_count} / {week.review.planned_workout_count}</dd></div>
             <div><dt>Actividades</dt><dd>{week.review.activity_count}</dd></div>
             <div><dt>Respuesta</dt><dd>{week.review.response_median === null ? "Sin datos" : `${week.review.response_median.toFixed(1)} %`}</dd></div>

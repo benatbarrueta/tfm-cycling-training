@@ -20,6 +20,7 @@ from app.database.models import (
     utc_now,
 )
 from app.season.service import (
+    _rpe_adaptation,
     advance_plan,
     list_adaptations,
     monday_on_or_after,
@@ -97,9 +98,29 @@ def test_weekly_summary_counts_all_load_and_only_linked_adherence():
     assert result.activities_without_tss == 1
     assert result.tss_coverage == pytest.approx(0.5)
     assert result.registered_rpe_load == pytest.approx(210)
+    assert result.median_perceived_exertion == pytest.approx(7)
     assert result.activities_with_rpe_load == 1
     assert result.activities_without_load == 0
     assert result.median_aerobic_decoupling == pytest.approx(6)
+
+
+def test_rpe_fallback_reduces_load_after_a_hard_week():
+    week, workout = build_week()
+    activity = ActivityRecord(
+        title="Sesión exigente",
+        started_at=datetime(2026, 10, 6, 8),
+        sport="CYCLING",
+        duration_minutes=130,
+        perceived_exertion=9,
+        source="MANUAL",
+        planned_workout=workout,
+    )
+    completion = summarize_completed_week(week, [activity])
+
+    decision, target = _rpe_adaptation(completion, 110)
+
+    assert decision.value == "REDUCE"
+    assert target == pytest.approx(93.5)
 
 
 def test_advance_plan_is_transactional_and_idempotent():

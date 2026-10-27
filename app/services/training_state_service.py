@@ -53,14 +53,16 @@ def build_training_state_from_activities(
 
     # Calculate TSS for current week activities
     current_week_tss = [
-        get_or_calculate_activity_tss(activity, ftp)
+        value
         for activity in current_week_activities
+        if (value := try_get_or_calculate_activity_tss(activity, ftp)) is not None
     ]
 
     # Calculate TSS for previous week activities
     previous_week_tss = [
-        get_or_calculate_activity_tss(activity, ftp)
+        value
         for activity in previous_week_activities
+        if (value := try_get_or_calculate_activity_tss(activity, ftp)) is not None
     ]
 
     weekly_tss = calculate_weekly_tss(current_week_tss)
@@ -105,3 +107,20 @@ def get_or_calculate_activity_tss(
         )
 
     return activity.tss
+
+
+def try_get_or_calculate_activity_tss(
+    activity: Activity,
+    ftp: float,
+) -> float | None:
+    """Return TSS when the activity contains enough data, otherwise skip it."""
+    if activity.tss is not None:
+        return activity.tss
+    if (
+        activity.normalized_power is None
+        or activity.normalized_power <= 0
+        or activity.duration_minutes is None
+        or activity.duration_minutes <= 0
+    ):
+        return None
+    return get_or_calculate_activity_tss(activity, ftp)
