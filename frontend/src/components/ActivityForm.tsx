@@ -41,6 +41,7 @@ export function ActivityForm({ initialValues, initialPlannedWorkoutId = null, ac
       average_heart_rate: initialValues?.average_heart_rate ?? "",
       intensity_factor: initialValues?.intensity_factor ?? "",
       tss: initialValues?.tss ?? "",
+      perceived_exertion: initialValues?.perceived_exertion ?? "",
       aerobic_decoupling: initialValues?.aerobic_decoupling ?? "",
       notes: initialValues?.notes ?? "",
     },
@@ -89,6 +90,7 @@ export function ActivityForm({ initialValues, initialPlannedWorkoutId = null, ac
       average_heart_rate: valueOrNull(values.average_heart_rate),
       intensity_factor: valueOrNull(values.intensity_factor),
       tss: valueOrNull(values.tss),
+      perceived_exertion: valueOrNull(values.perceived_exertion),
       aerobic_decoupling: valueOrNull(values.aerobic_decoupling),
       notes: values.notes?.trim() || null,
     }, plannedWorkoutId || null);
@@ -101,6 +103,7 @@ export function ActivityForm({ initialValues, initialPlannedWorkoutId = null, ac
     ["average_heart_rate", "FC media (ppm)", "number"],
     ["intensity_factor", "Factor de intensidad", "number"],
     ["tss", "TSS", "number"],
+    ["perceived_exertion", "Esfuerzo percibido (RPE 1–10)", "number"],
     ["aerobic_decoupling", "Desacoplamiento (%)", "number"],
   ] as const;
 
@@ -131,9 +134,24 @@ export function ActivityForm({ initialValues, initialPlannedWorkoutId = null, ac
           )}
           {workoutStatus === "error" && <small>No se han podido consultar las sesiones planificadas.</small>}
         </label>
-        <label className="activity-form__field"><span>Duración (minutos) *</span><input type="number" min="0.1" step="0.1" {...register("duration_minutes")} />{errors.duration_minutes && <small>{errors.duration_minutes.message}</small>}</label>
+        <label className="activity-form__field"><span>Duración (minutos) *</span><input type="number" min="0.01" step="any" {...register("duration_minutes")} />{errors.duration_minutes && <small>{errors.duration_minutes.message}</small>}</label>
         {fields.map(([name, label, type]) => (
-          <label className="activity-form__field" key={name}><span>{label}</span><input type={type} step="0.1" min={name === "aerobic_decoupling" ? undefined : "0"} {...register(name)} />{errors[name] && <small>{errors[name]?.message}</small>}</label>
+          <label className="activity-form__field" key={name}>
+            <span>{label}</span>
+            <input
+              type={type}
+              step={name === "perceived_exertion" ? "1" : "any"}
+              min={name === "aerobic_decoupling" ? undefined : name === "perceived_exertion" ? "1" : "0"}
+              max={name === "perceived_exertion" ? "10" : undefined}
+              {...register(name)}
+            />
+            {name === "perceived_exertion" && (
+              <small className="activity-form__hint">
+                Úsalo si no tienes TSS: 1 es muy suave y 10 es un esfuerzo máximo.
+              </small>
+            )}
+            {errors[name] && <small>{errors[name]?.message}</small>}
+          </label>
         ))}
         <label className="activity-form__field activity-form__field--full"><span>Notas</span><textarea {...register("notes")} rows={3} /></label>
       </div>

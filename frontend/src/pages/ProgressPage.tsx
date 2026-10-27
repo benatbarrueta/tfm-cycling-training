@@ -31,10 +31,15 @@ export function ProgressPage() {
     0,
   );
 
-  const adherence =
-    plannedTss > 0
-      ? (completedTss / plannedTss) * 100
-      : 0;
+  const plannedWorkouts = evaluatedWeeks.reduce(
+    (total, week) => total + (week.review?.planned_workout_count ?? 0),
+    0,
+  );
+  const completedWorkouts = evaluatedWeeks.reduce(
+    (total, week) => total + (week.review?.completed_workout_count ?? 0),
+    0,
+  );
+  const adherence = plannedWorkouts > 0 ? (completedWorkouts / plannedWorkouts) * 100 : 0;
 
   const aerobicResponses = evaluatedWeeks
     .map((week) => week.review?.response_median ?? null)
@@ -61,6 +66,14 @@ export function ProgressPage() {
   );
   const activitiesWithoutTss = evaluatedWeeks.reduce(
     (total, week) => total + (week.review?.activities_without_tss ?? 0),
+    0,
+  );
+  const estimatedRpeLoad = evaluatedWeeks.reduce(
+    (total, week) => total + (week.review?.registered_rpe_load ?? 0),
+    0,
+  );
+  const activitiesWithoutLoad = evaluatedWeeks.reduce(
+    (total, week) => total + (week.review?.activities_without_load ?? 0),
     0,
   );
   const activitiesWithoutResponse = evaluatedWeeks.reduce(
@@ -116,7 +129,7 @@ export function ProgressPage() {
             <p>
               {activitiesWithoutTss === 0
                 ? "Todas tienen TSS."
-                : `${activitiesWithoutTss} sin TSS.`}{" "}
+                : `${activitiesWithoutTss} sin TSS; ${estimatedRpeLoad.toFixed(0)} RPE·min se mantienen como carga estimada separada.`}{" "}
               {activitiesWithoutResponse === 0
                 ? "Todas tienen desacoplamiento aeróbico."
                 : `${activitiesWithoutResponse} sin desacoplamiento aeróbico.`}
@@ -151,12 +164,12 @@ export function ProgressPage() {
         </article>
 
         <article>
-          <span>TSS realizado</span>
+          <span>{completedTss > 0 ? "TSS realizado" : "Carga estimada"}</span>
           <strong>
-            {completedTss.toFixed(0)}
+            {completedTss > 0 ? completedTss.toFixed(0) : `${estimatedRpeLoad.toFixed(0)} RPE·min`}
           </strong>
           <small>
-            Carga completada
+            {activitiesWithoutLoad > 0 ? `${activitiesWithoutLoad} actividades sin datos de carga` : "Carga completada"}
           </small>
         </article>
 
@@ -178,7 +191,7 @@ export function ProgressPage() {
           <div>
             <h2>Carga por semana</h2>
             <p>
-              TSS planificado frente al realizado.
+              TSS planificado frente al realizado. La carga RPE se informa aparte porque utiliza otra escala.
             </p>
           </div>
 

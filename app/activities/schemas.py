@@ -29,6 +29,7 @@ class ActivityInput(BaseModel):
     average_heart_rate: float | None = Field(default=None, gt=0)
     intensity_factor: float | None = Field(default=None, ge=0)
     tss: float | None = Field(default=None, ge=0)
+    perceived_exertion: int | None = Field(default=None, ge=1, le=10)
     aerobic_decoupling: float | None = None
     notes: str | None = Field(default=None, max_length=4000)
 
@@ -70,6 +71,8 @@ class ActivityRead(ActivityInput):
     planned_workout_id: UUID | None
     started_at: datetime
     source: ActivitySource
+    estimated_load: float | None
+    load_source: str
     created_at: datetime
     updated_at: datetime
 

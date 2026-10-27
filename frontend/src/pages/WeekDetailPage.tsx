@@ -68,6 +68,7 @@ export function WeekDetailPage() {
           <header><h2>Resultado de la semana</h2><p>{week.review.decision_reason}</p></header>
           <dl>
             <div><dt>TSS realizado</dt><dd>{week.review.registered_tss.toFixed(0)} / {week.review.planned_tss.toFixed(0)}</dd></div>
+            <div><dt>Carga estimada</dt><dd>{week.review.registered_rpe_load.toFixed(0)} RPE·min</dd></div>
             <div><dt>Sesiones vinculadas</dt><dd>{week.review.completed_workout_count} / {week.review.planned_workout_count}</dd></div>
             <div><dt>Actividades</dt><dd>{week.review.activity_count}</dd></div>
             <div><dt>Respuesta</dt><dd>{week.review.response_median === null ? "Sin datos" : `${week.review.response_median.toFixed(1)} %`}</dd></div>

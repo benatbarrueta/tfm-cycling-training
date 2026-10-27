@@ -255,6 +255,9 @@ def preview_week_review(
         "activity_count": summary.completed_activity_count,
         "activities_with_tss": summary.activities_with_tss,
         "activities_without_tss": summary.activities_without_tss,
+        "registered_rpe_load": summary.registered_rpe_load,
+        "activities_with_rpe_load": summary.activities_with_rpe_load,
+        "activities_without_load": summary.activities_without_load,
         "response_median": summary.median_aerobic_decoupling,
         "response_count": summary.responses_available,
         "activities_without_response": (
@@ -327,6 +330,9 @@ def _decision_reason(
     load_decision: str | None,
     registered_tss: float,
     planned_tss: float,
+    registered_rpe_load: float,
+    activities_with_tss: int,
+    completed_activity_count: int,
     provisional_target_tss: float | None,
     requested_target_tss: float | None,
     adapted_target_tss: float | None,
@@ -342,10 +348,23 @@ def _decision_reason(
         "MAINTAIN": "la decisión semanal es mantener la carga de referencia",
         None: "todavía no hay datos suficientes para una decisión semanal de carga",
     }[load_decision]
-    reason = (
-        f"{response_text}; {decision_text}. "
-        f"Se registraron {registered_tss:.1f} de {planned_tss:.1f} TSS planificados."
-    )
+    if activities_with_tss > 0:
+        load_text = (
+            f"Se registraron {registered_tss:.1f} de {planned_tss:.1f} TSS planificados."
+        )
+    elif registered_rpe_load > 0:
+        load_text = (
+            f"Las {completed_activity_count} actividades realizadas no aportaron TSS; "
+            f"su carga percibida fue {registered_rpe_load:.1f} unidades RPE."
+        )
+    elif completed_activity_count > 0:
+        load_text = (
+            f"Se registraron {completed_activity_count} actividades, pero no contienen "
+            "TSS ni esfuerzo percibido para cuantificar su carga."
+        )
+    else:
+        load_text = "No se registraron actividades durante la semana."
+    reason = f"{response_text}; {decision_text}. {load_text}"
     if provisional_target_tss is not None and requested_target_tss is not None:
         reason += (
             f" La previsión de temporada era {provisional_target_tss:.1f} TSS "
@@ -450,6 +469,9 @@ def advance_plan(
         load_decision,
         completion.registered_tss,
         completion.planned_tss,
+        completion.registered_rpe_load,
+        completion.activities_with_tss,
+        completion.completed_activity_count,
         provisional_target,
         generated_summary["requested_target_tss"] if generated_summary else None,
         adapted_target,
@@ -467,6 +489,9 @@ def advance_plan(
         activity_count=completion.completed_activity_count,
         activities_with_tss=completion.activities_with_tss,
         activities_without_tss=completion.activities_without_tss,
+        registered_rpe_load=completion.registered_rpe_load,
+        activities_with_rpe_load=completion.activities_with_rpe_load,
+        activities_without_load=completion.activities_without_load,
         response_median=completion.median_aerobic_decoupling,
         response_count=completion.responses_available,
         load_decision=load_decision,
@@ -548,6 +573,9 @@ def recalculate_week_review(
     review.activity_count = completion.completed_activity_count
     review.activities_with_tss = completion.activities_with_tss
     review.activities_without_tss = completion.activities_without_tss
+    review.registered_rpe_load = completion.registered_rpe_load
+    review.activities_with_rpe_load = completion.activities_with_rpe_load
+    review.activities_without_load = completion.activities_without_load
     review.response_median = completion.median_aerobic_decoupling
     review.response_count = completion.responses_available
     db.commit()

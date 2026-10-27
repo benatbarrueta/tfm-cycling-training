@@ -16,6 +16,9 @@ class WeeklyCompletionSummary:
     activities_with_tss: int
     activities_without_tss: int
     tss_coverage: float
+    registered_rpe_load: float
+    activities_with_rpe_load: int
+    activities_without_load: int
     planned_duration_minutes: float
     registered_duration_minutes: float
     workout_completion_rate: float
@@ -36,6 +39,11 @@ def summarize_completed_week(
         if activity.planned_workout_id in workout_ids
     }
     known_tss = [float(activity.tss) for activity in activities if activity.tss is not None]
+    rpe_loads = [
+        float(activity.estimated_load)
+        for activity in activities
+        if activity.tss is None and activity.estimated_load is not None
+    ]
     responses = [
         float(activity.aerobic_decoupling)
         for activity in activities
@@ -62,6 +70,11 @@ def summarize_completed_week(
         activities_with_tss=len(known_tss),
         activities_without_tss=activity_count - len(known_tss),
         tss_coverage=(len(known_tss) / activity_count) if activity_count else 0.0,
+        registered_rpe_load=sum(rpe_loads),
+        activities_with_rpe_load=len(rpe_loads),
+        activities_without_load=(
+            activity_count - len(known_tss) - len(rpe_loads)
+        ),
         planned_duration_minutes=planned_duration,
         registered_duration_minutes=sum(float(activity.duration_minutes) for activity in activities),
         workout_completion_rate=(len(linked_workout_ids) / planned_count) if planned_count else 0.0,

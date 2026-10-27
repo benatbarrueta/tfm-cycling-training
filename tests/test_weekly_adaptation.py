@@ -84,6 +84,7 @@ def test_weekly_summary_counts_all_load_and_only_linked_adherence():
         sport="CYCLING",
         duration_minutes=30,
         tss=None,
+        perceived_exertion=7,
         aerobic_decoupling=8,
         source="MANUAL",
     )
@@ -95,6 +96,9 @@ def test_weekly_summary_counts_all_load_and_only_linked_adherence():
     assert result.completed_activity_count == 2
     assert result.activities_without_tss == 1
     assert result.tss_coverage == pytest.approx(0.5)
+    assert result.registered_rpe_load == pytest.approx(210)
+    assert result.activities_with_rpe_load == 1
+    assert result.activities_without_load == 0
     assert result.median_aerobic_decoupling == pytest.approx(6)
 
 

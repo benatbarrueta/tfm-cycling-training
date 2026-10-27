@@ -42,12 +42,21 @@ def has_sufficient_training_history(
         - timedelta(days=7)
     )
 
+    def has_tss_input(activity: Activity) -> bool:
+        return activity.tss is not None or (
+            activity.normalized_power is not None
+            and activity.normalized_power > 0
+            and activity.duration_minutes is not None
+            and activity.duration_minutes > 0
+        )
+
     current_week_count = sum(
         1
         for activity in activities
         if current_week_start
         <= activity.date
         < reference_week_start
+        and has_tss_input(activity)
     )
 
     previous_week_count = sum(
@@ -56,6 +65,7 @@ def has_sufficient_training_history(
         if previous_week_start
         <= activity.date
         < current_week_start
+        and has_tss_input(activity)
     )
 
     return (

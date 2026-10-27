@@ -99,6 +99,7 @@ class ActivityRecord(Base):
     average_heart_rate: Mapped[float | None] = mapped_column(Float)
     intensity_factor: Mapped[float | None] = mapped_column(Float)
     tss: Mapped[float | None] = mapped_column(Float)
+    perceived_exertion: Mapped[int | None] = mapped_column(Integer)
     aerobic_decoupling: Mapped[float | None] = mapped_column(Float)
     source: Mapped[str] = mapped_column(String(32), nullable=False)
     external_source_id: Mapped[str | None] = mapped_column(String(255))
@@ -106,6 +107,20 @@ class ActivityRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
     planned_workout: Mapped["PlannedWorkout | None"] = relationship(back_populates="activities")
+
+    @property
+    def estimated_load(self) -> float | None:
+        if self.perceived_exertion is None:
+            return None
+        return round(self.duration_minutes * self.perceived_exertion, 1)
+
+    @property
+    def load_source(self) -> str:
+        if self.tss is not None:
+            return "TSS"
+        if self.perceived_exertion is not None:
+            return "RPE"
+        return "UNKNOWN"
 
 
 class SeasonPlan(Base):
@@ -225,6 +240,9 @@ class WeeklyReview(Base):
     activity_count: Mapped[int] = mapped_column(Integer, nullable=False)
     activities_with_tss: Mapped[int] = mapped_column(Integer, nullable=False)
     activities_without_tss: Mapped[int] = mapped_column(Integer, nullable=False)
+    registered_rpe_load: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    activities_with_rpe_load: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    activities_without_load: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     response_median: Mapped[float | None] = mapped_column(Float)
     response_count: Mapped[int] = mapped_column(Integer, nullable=False)
     load_decision: Mapped[str | None] = mapped_column(String(32))

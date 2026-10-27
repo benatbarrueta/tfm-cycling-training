@@ -57,6 +57,10 @@ export function ActivitiesPage() {
   }
 
   const tss = activities.reduce((totalValue, item) => totalValue + (item.tss ?? 0), 0);
+  const estimatedRpeLoad = activities.reduce(
+    (totalValue, item) => totalValue + (item.load_source === "RPE" ? item.estimated_load ?? 0 : 0),
+    0,
+  );
 
   async function selectImportFile(file: File | undefined) {
     if (file === undefined) return;
@@ -100,6 +104,7 @@ export function ActivitiesPage() {
       <section className="activities-page__summary" aria-label="Resumen del historial">
         <article><strong>{total}</strong><span>actividades</span></article>
         <article><strong>{tss.toFixed(0)}</strong><span>TSS cargado</span></article>
+        <article><strong>{estimatedRpeLoad.toFixed(0)}</strong><span>carga estimada por RPE</span></article>
         <article><strong>{activities.filter((item) => item.aerobic_decoupling !== null).length}</strong><span>con desacoplamiento</span></article>
       </section>
       {importPreview !== null && (
@@ -171,7 +176,7 @@ export function ActivitiesPage() {
         {status === "empty" && <div className="activities-page__empty"><strong>No hay actividades registradas</strong><p>Utiliza el formulario superior para añadir tu primer entrenamiento.</p></div>}
         {status === "ready" && (
           <div className="activities-page__table-wrapper">
-            <table className="activities-page__table"><thead><tr><th>Actividad</th><th>Fecha</th><th>Duración</th><th>Distancia</th><th>Potencia</th><th>FC</th><th>TSS</th><th>Sesión</th><th>Acciones</th></tr></thead>
+            <table className="activities-page__table"><thead><tr><th>Actividad</th><th>Fecha</th><th>Duración</th><th>Distancia</th><th>Potencia</th><th>FC</th><th>Carga</th><th>Sesión</th><th>Acciones</th></tr></thead>
               <tbody>{activities.map((activity) => <tr key={activity.id}>
                 <td>
                   <strong className="activities-page__activity-title">{activity.title}</strong>
@@ -184,7 +189,12 @@ export function ActivitiesPage() {
                   </small>
                 </td>
                 <td>{new Date(activity.started_at).toLocaleString("es-ES")}</td>
-                <td>{metric(activity.duration_minutes, " min")}</td><td>{metric(activity.distance_km, " km")}</td><td>{metric(activity.average_power, " W")}</td><td>{metric(activity.average_heart_rate, " ppm")}</td><td>{metric(activity.tss)}</td>
+                <td>{metric(activity.duration_minutes, " min")}</td><td>{metric(activity.distance_km, " km")}</td><td>{metric(activity.average_power, " W")}</td><td>{metric(activity.average_heart_rate, " ppm")}</td>
+                <td>
+                  {activity.load_source === "TSS" && `${activity.tss?.toFixed(0)} TSS`}
+                  {activity.load_source === "RPE" && `${activity.estimated_load?.toFixed(0)} RPE·min`}
+                  {activity.load_source === "UNKNOWN" && "Sin datos"}
+                </td>
                 <td><span className={activity.planned_workout_id === null ? "activities-page__link-status activities-page__link-status--extra" : "activities-page__link-status"}>{activity.planned_workout_id === null ? "Actividad adicional" : "Vinculada"}</span></td>
                 <td className="activities-page__actions">
                   <button

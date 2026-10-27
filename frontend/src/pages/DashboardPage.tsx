@@ -114,7 +114,16 @@ export function DashboardPage() {
     ? selectedWeek.workouts.reduce((total, workout) => total + (workout.duration_minutes ?? 0), 0) / 60
     : selectedWeek.provisional_hours;
   const isCurrent = temporalState === "CURRENT";
-  const progress = isCurrent && plannedTss > 0 ? Math.min(100, (activitySummary.knownTss / plannedTss) * 100) : 0;
+  const progressUsesTss = activitySummary.activitiesWithTss > 0;
+  const progress = !isCurrent
+    ? 0
+    : progressUsesTss && plannedTss > 0
+      ? Math.min(100, (activitySummary.knownTss / plannedTss) * 100)
+      : selectedWeek.workouts.length > 0
+        ? Math.min(100, (activitySummary.linkedActivityCount / selectedWeek.workouts.length) * 100)
+        : plannedHours > 0
+          ? Math.min(100, (activitySummary.durationMinutes / (plannedHours * 60)) * 100)
+          : 0;
   const nextWorkout = selectedWeek.workouts
     .filter((workout) => workout.scheduled_date >= today)
     .sort((left, right) => left.scheduled_date.localeCompare(right.scheduled_date))[0];
@@ -243,11 +252,12 @@ export function DashboardPage() {
               <div><dt>Sesiones vinculadas</dt><dd>{reviewPreview.completed_workout_count} / {reviewPreview.planned_workout_count}</dd></div>
               <div><dt>Actividades registradas</dt><dd>{reviewPreview.activity_count}</dd></div>
               <div><dt>TSS registrado</dt><dd>{reviewPreview.registered_tss.toFixed(0)} / {reviewPreview.planned_tss.toFixed(0)}</dd></div>
+              <div><dt>Carga estimada</dt><dd>{reviewPreview.registered_rpe_load.toFixed(0)} RPE·min</dd></div>
               <div><dt>Tiempo registrado</dt><dd>{reviewPreview.registered_duration_minutes.toFixed(0)} / {reviewPreview.planned_duration_minutes.toFixed(0)} min</dd></div>
-              <div><dt>Sin TSS</dt><dd>{reviewPreview.activities_without_tss}</dd></div>
+              <div><dt>Sin datos de carga</dt><dd>{reviewPreview.activities_without_load}</dd></div>
               <div><dt>Sin respuesta aeróbica</dt><dd>{reviewPreview.activities_without_response}</dd></div>
             </dl>
-            {(reviewPreview.activities_without_tss > 0 || reviewPreview.activities_without_response > 0) && (
+            {(reviewPreview.activities_without_load > 0 || reviewPreview.activities_without_response > 0) && (
               <p className="dashboard__review-warning">
                 Puedes volver al calendario para completar los datos. También puedes cerrar la semana; los datos ausentes quedarán registrados.
               </p>
@@ -272,9 +282,15 @@ export function DashboardPage() {
 
       <section className="dashboard__metrics">
         <article>
-          <span>{isCurrent ? "TSS registrado / planificado" : "TSS objetivo"}</span>
-          <strong>{isCurrent ? `${activitySummary.knownTss.toFixed(0)} / ` : ""}{plannedTss.toFixed(0)}</strong>
-          <small>{isCurrent ? "Solo actividades de esta semana" : "Semana de entrenamiento seleccionada"}</small>
+          <span>{isCurrent ? progressUsesTss ? "TSS registrado / planificado" : "Sesiones realizadas" : "TSS objetivo"}</span>
+          <strong>
+            {isCurrent
+              ? progressUsesTss
+                ? `${activitySummary.knownTss.toFixed(0)} / ${plannedTss.toFixed(0)}`
+                : `${activitySummary.linkedActivityCount} / ${selectedWeek.workouts.length}`
+              : plannedTss.toFixed(0)}
+          </strong>
+          <small>{isCurrent && !progressUsesTss ? "Progreso calculado por cumplimiento" : isCurrent ? "Solo actividades de esta semana" : "Semana de entrenamiento seleccionada"}</small>
         </article>
         <article>
           <span>Tiempo planificado</span>
@@ -319,7 +335,8 @@ export function DashboardPage() {
                 {activitySummary.activityCount} actividades ·{" "}
                 {activitySummary.knownTss.toFixed(0)} TSS registrados ·{" "}
                 {activitySummary.durationMinutes} min de entrenamiento.
-                {activitySummary.activitiesWithoutTss > 0 && ` ${activitySummary.activitiesWithoutTss} actividad${activitySummary.activitiesWithoutTss === 1 ? "" : "es"} sin TSS.`}
+                {activitySummary.estimatedRpeLoad > 0 && ` ${activitySummary.estimatedRpeLoad.toFixed(0)} RPE·min de carga estimada.`}
+                {activitySummary.activitiesWithoutTss > 0 && activitySummary.activitiesWithEstimatedLoad === 0 && ` ${activitySummary.activitiesWithoutTss} actividad${activitySummary.activitiesWithoutTss === 1 ? "" : "es"} sin datos de carga.`}
                 {!isCurrent && " Las actividades anteriores no se mezclan con el progreso de la próxima semana."}
               </p>
             </>

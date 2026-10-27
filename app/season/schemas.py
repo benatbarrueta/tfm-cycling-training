@@ -62,6 +62,9 @@ class WeeklyReviewRead(BaseModel):
     activity_count: int
     activities_with_tss: int
     activities_without_tss: int
+    registered_rpe_load: float
+    activities_with_rpe_load: int
+    activities_without_load: int
     response_median: float | None
     response_count: int
     load_decision: str | None
@@ -128,6 +131,9 @@ class WeeklyReviewPreviewRead(BaseModel):
     activity_count: int
     activities_with_tss: int
     activities_without_tss: int
+    registered_rpe_load: float
+    activities_with_rpe_load: int
+    activities_without_load: int
     response_median: float | None
     response_count: int
     activities_without_response: int

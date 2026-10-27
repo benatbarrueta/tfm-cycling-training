@@ -66,6 +66,25 @@ def test_history_is_not_sufficient():
     assert result is False
 
 
+def test_history_without_power_or_tss_uses_cold_start():
+    activities = [
+        Activity(
+            date=date(2026, 9, day),
+            duration_minutes=60,
+            average_power=None,
+            normalized_power=None,
+        )
+        for day in (1, 4, 8, 11)
+    ]
+
+    result = has_sufficient_training_history(
+        activities=activities,
+        reference_date=date(2026, 9, 16),
+    )
+
+    assert result is False
+
+
 def test_calculate_initial_target_tss_intermediate():
     cyclist = Cyclist(
         cyclist_id=1,

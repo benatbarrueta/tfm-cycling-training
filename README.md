@@ -190,6 +190,13 @@ importaciones directas desde GoldenCheetah y servicios externos quedan
 pendientes. El plan de temporada, los workouts planificados, el dashboard,
 el calendario y la vista Evolución consumen la API persistida.
 
+Cuando una actividad no contiene TSS, el usuario puede indicar un esfuerzo
+percibido entre 1 y 10. Veloform calcula `duración × RPE` y lo conserva como
+carga estimada en `RPE·min`. Esta carga sirve para documentar el esfuerzo y
+el cumplimiento, pero se mantiene separada del TSS porque ambas métricas no
+comparten escala. La ausencia de potencia tampoco impide vincular una
+actividad con su sesión planificada ni contabilizar su duración.
+
 ### Cierre y adaptación semanal
 
 Cuando termina la semana activa, Inicio muestra la acción «Revisar semana y

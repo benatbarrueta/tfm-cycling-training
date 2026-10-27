@@ -15,6 +15,10 @@ export const activitySchema = z.object({
   average_heart_rate: optionalNumber.refine((value) => value === null || value > 0, "Debe ser mayor que cero."),
   intensity_factor: optionalNumber.refine((value) => value === null || value >= 0, "No puede ser negativo."),
   tss: optionalNumber.refine((value) => value === null || value >= 0, "No puede ser negativo."),
+  perceived_exertion: optionalNumber.refine(
+    (value) => value === null || (Number.isInteger(value) && value >= 1 && value <= 10),
+    "El esfuerzo percibido debe ser un número entero entre 1 y 10.",
+  ),
   aerobic_decoupling: optionalNumber,
   notes: z.string().nullable(),
 });

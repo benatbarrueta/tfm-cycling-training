@@ -53,6 +53,9 @@ export interface WeeklyReview {
   activity_count: number;
   activities_with_tss: number;
   activities_without_tss: number;
+  registered_rpe_load: number;
+  activities_with_rpe_load: number;
+  activities_without_load: number;
   response_median: number | null;
   response_count: number;
   load_decision: string | null;
@@ -96,6 +99,9 @@ export interface WeeklyReviewPreview {
   activity_count: number;
   activities_with_tss: number;
   activities_without_tss: number;
+  registered_rpe_load: number;
+  activities_with_rpe_load: number;
+  activities_without_load: number;
   response_median: number | null;
   response_count: number;
   activities_without_response: number;

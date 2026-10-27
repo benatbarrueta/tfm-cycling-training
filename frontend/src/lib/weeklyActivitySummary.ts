@@ -7,6 +7,9 @@ export interface WeeklyActivitySummary {
   knownTss: number;
   activitiesWithTss: number;
   activitiesWithoutTss: number;
+  estimatedRpeLoad: number;
+  activitiesWithEstimatedLoad: number;
+  linkedActivityCount: number;
   averageAerobicDecoupling: number | null;
 }
 
@@ -36,6 +39,12 @@ export function summarizeWeeklyActivities(
     ),
     activitiesWithTss: included.filter((activity) => activity.tss !== null).length,
     activitiesWithoutTss: included.filter((activity) => activity.tss === null).length,
+    estimatedRpeLoad: included.reduce(
+      (total, activity) => total + (activity.load_source === "RPE" ? activity.estimated_load ?? 0 : 0),
+      0,
+    ),
+    activitiesWithEstimatedLoad: included.filter((activity) => activity.load_source === "RPE").length,
+    linkedActivityCount: included.filter((activity) => activity.planned_workout_id !== null).length,
     averageAerobicDecoupling:
       decouplings.length === 0
         ? null

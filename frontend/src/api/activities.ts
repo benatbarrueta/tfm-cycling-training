@@ -13,6 +13,9 @@ export interface Activity {
   average_heart_rate: number | null;
   intensity_factor: number | null;
   tss: number | null;
+  perceived_exertion: number | null;
+  estimated_load: number | null;
+  load_source: "TSS" | "RPE" | "UNKNOWN";
   aerobic_decoupling: number | null;
   source: string;
   notes: string | null;
@@ -22,7 +25,7 @@ export interface Activity {
 
 export type ActivityInput = Omit<
   Activity,
-  "id" | "planned_workout_id" | "source" | "created_at" | "updated_at"
+  "id" | "planned_workout_id" | "source" | "estimated_load" | "load_source" | "created_at" | "updated_at"
 >;
 
 export interface ActivityListResponse {
