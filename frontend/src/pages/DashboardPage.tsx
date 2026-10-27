@@ -46,14 +46,16 @@ export function DashboardPage() {
     referenceDate,
     timezone,
   );
-  const selectedWeek = plan === null ? null : chooseWeek(plan.weeks, today);
   const overdueActiveWeek = plan?.weeks.find(
     (week) => week.status === "PENDING_REVIEW" || (week.status === "ACTIVE" && week.week_end < today),
   ) ?? null;
+  const selectedWeek = overdueActiveWeek ?? (plan === null ? null : chooseWeek(plan.weeks, today));
+  const activityWeekStart = selectedWeek?.week_start ?? currentWeek.weekStart;
+  const activityWeekEnd = selectedWeek?.week_end ?? currentWeek.weekEnd;
   const activityFilters = {
-    start: localDateToUtcIso(currentWeek.weekStart, timezone),
+    start: localDateToUtcIso(activityWeekStart, timezone),
     end: localDateToUtcIso(
-      format(addDays(parseISO(currentWeek.weekEnd), 1), "yyyy-MM-dd"),
+      format(addDays(parseISO(activityWeekEnd), 1), "yyyy-MM-dd"),
       timezone,
     ),
     limit: 100,
@@ -105,8 +107,8 @@ export function DashboardPage() {
   const weekLabel = getWeekLabel(selectedWeek.status, temporalState);
   const activitySummary = summarizeWeeklyActivities(
     activities,
-    currentWeek.weekStart,
-    currentWeek.weekEnd,
+    selectedWeek.week_start,
+    selectedWeek.week_end,
     timezone,
   );
   const plannedTss = selectedWeek.adapted_target_tss ?? selectedWeek.estimated_total_tss ?? selectedWeek.provisional_target_tss;
@@ -114,8 +116,10 @@ export function DashboardPage() {
     ? selectedWeek.workouts.reduce((total, workout) => total + (workout.duration_minutes ?? 0), 0) / 60
     : selectedWeek.provisional_hours;
   const isCurrent = temporalState === "CURRENT";
+  const isPendingReview = selectedWeek.status === "PENDING_REVIEW";
+  const showsWeeklyProgress = isCurrent || isPendingReview;
   const progressUsesTss = activitySummary.activitiesWithTss > 0;
-  const progress = !isCurrent
+  const progress = !showsWeeklyProgress
     ? 0
     : progressUsesTss && plannedTss > 0
       ? Math.min(100, (activitySummary.knownTss / plannedTss) * 100)
@@ -287,15 +291,15 @@ export function DashboardPage() {
 
       <section className="dashboard__metrics">
         <article>
-          <span>{isCurrent ? progressUsesTss ? "TSS registrado / planificado" : "Sesiones realizadas" : "TSS objetivo"}</span>
+          <span>{showsWeeklyProgress ? progressUsesTss ? "TSS registrado / planificado" : "Sesiones realizadas" : "TSS objetivo"}</span>
           <strong>
-            {isCurrent
+            {showsWeeklyProgress
               ? progressUsesTss
                 ? `${activitySummary.knownTss.toFixed(0)} / ${plannedTss.toFixed(0)}`
                 : `${activitySummary.linkedActivityCount} / ${selectedWeek.workouts.length}`
               : plannedTss.toFixed(0)}
           </strong>
-          <small>{isCurrent && !progressUsesTss ? "Progreso calculado por cumplimiento" : isCurrent ? "Solo actividades de esta semana" : "Semana de entrenamiento seleccionada"}</small>
+          <small>{showsWeeklyProgress && !progressUsesTss ? "Progreso calculado por cumplimiento" : showsWeeklyProgress ? "Solo actividades de esta semana" : "Semana de entrenamiento seleccionada"}</small>
         </article>
         <article>
           <span>Tiempo planificado</span>
@@ -318,12 +322,12 @@ export function DashboardPage() {
         <article className="dashboard__progress">
           <header>
             <div>
-              <span>{isCurrent ? "Progreso semanal" : "Actividades recientes"}</span>
+              <span>{showsWeeklyProgress ? "Progreso semanal" : "Actividades recientes"}</span>
               {activitiesStatus === "ready" && (
-                <strong>{isCurrent ? `${progress.toFixed(0)} %` : `${activitySummary.activityCount} actividades`}</strong>
+                <strong>{showsWeeklyProgress ? `${progress.toFixed(0)} %` : `${activitySummary.activityCount} actividades`}</strong>
               )}
             </div>
-            <Link to={`/calendar?view=week&date=${currentWeek.weekStart}`}>Ver semana</Link>
+            <Link to={`/calendar?view=week&date=${selectedWeek.week_start}`}>Ver semana</Link>
           </header>
           {activitiesStatus === "loading" && <p>Cargando actividades…</p>}
           {activitiesStatus === "error" && (
@@ -335,14 +339,14 @@ export function DashboardPage() {
           {activitiesStatus === "empty" && <p>No has registrado actividades esta semana.</p>}
           {activitiesStatus === "ready" && (
             <>
-              {isCurrent && <div className="dashboard__progress-track" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div>}
+              {showsWeeklyProgress && <div className="dashboard__progress-track" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div>}
               <p>
                 {activitySummary.activityCount} actividades ·{" "}
                 {activitySummary.knownTss.toFixed(0)} TSS registrados ·{" "}
                 {activitySummary.durationMinutes} min de entrenamiento.
                 {activitySummary.estimatedRpeLoad > 0 && ` ${activitySummary.estimatedRpeLoad.toFixed(0)} RPE·min de carga estimada.`}
                 {activitySummary.activitiesWithoutTss > 0 && activitySummary.activitiesWithEstimatedLoad === 0 && ` ${activitySummary.activitiesWithoutTss} actividad${activitySummary.activitiesWithoutTss === 1 ? "" : "es"} sin datos de carga.`}
-                {!isCurrent && " Las actividades anteriores no se mezclan con el progreso de la próxima semana."}
+                {!showsWeeklyProgress && " Las actividades anteriores no se mezclan con el progreso de la próxima semana."}
               </p>
             </>
           )}
