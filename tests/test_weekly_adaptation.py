@@ -23,6 +23,7 @@ from app.season.service import (
     _rpe_adaptation,
     advance_plan,
     list_adaptations,
+    mark_overdue_week_pending_review,
     monday_on_or_after,
     preview_week_review,
     recalculate_week_review,
@@ -102,6 +103,62 @@ def test_weekly_summary_counts_all_load_and_only_linked_adherence():
     assert result.activities_with_rpe_load == 1
     assert result.activities_without_load == 0
     assert result.median_aerobic_decoupling == pytest.approx(6)
+
+
+def test_elapsed_active_week_becomes_pending_review_idempotently():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        user = User(email="pending@example.com", display_name="Pending", is_demo=True)
+        db.add(user)
+        db.flush()
+        plan = SeasonPlan(
+            user_id=user.id,
+            name="Temporada",
+            status="ACTIVE",
+            start_date=date(2026, 10, 5),
+            target_date=date(2026, 12, 20),
+            objective="PERFORMANCE",
+            modality="XCO",
+            level="INTERMEDIATE",
+            ftp_snapshot=250,
+            weekly_hours_snapshot=6,
+            available_days_snapshot=["TUESDAY", "THURSDAY"],
+            generator_version="test",
+        )
+        phase = TrainingPhase(
+            season_plan=plan,
+            phase_type="BASE",
+            position=1,
+            start_date=date(2026, 10, 5),
+            end_date=date(2026, 10, 11),
+            week_count=1,
+        )
+        week = PlannedWeek(
+            season_plan=plan,
+            training_phase=phase,
+            position=1,
+            week_start=date(2026, 10, 5),
+            week_end=date(2026, 10, 11),
+            status="ACTIVE",
+            focus="BASE",
+            provisional_target_tss=100,
+            provisional_hours=2,
+        )
+        db.add_all([plan, phase, week])
+        db.commit()
+
+        detected = mark_overdue_week_pending_review(
+            db, user.id, reference=date(2026, 10, 12)
+        )
+        repeated = mark_overdue_week_pending_review(
+            db, user.id, reference=date(2026, 10, 13)
+        )
+
+        assert detected is not None
+        assert repeated is not None
+        assert detected.weeks[0].status == "PENDING_REVIEW"
+        assert repeated.weeks[0].status == "PENDING_REVIEW"
 
 
 def test_rpe_fallback_reduces_load_after_a_hard_week():

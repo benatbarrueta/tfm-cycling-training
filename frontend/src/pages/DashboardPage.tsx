@@ -48,7 +48,7 @@ export function DashboardPage() {
   );
   const selectedWeek = plan === null ? null : chooseWeek(plan.weeks, today);
   const overdueActiveWeek = plan?.weeks.find(
-    (week) => week.status === "ACTIVE" && week.week_end < today,
+    (week) => week.status === "PENDING_REVIEW" || (week.status === "ACTIVE" && week.week_end < today),
   ) ?? null;
   const activityFilters = {
     start: localDateToUtcIso(currentWeek.weekStart, timezone),
@@ -225,14 +225,19 @@ export function DashboardPage() {
 
       {overdueActiveWeek !== null && (
         <section className="dashboard__weekly-review">
-          <div>
-            <strong>La semana del {format(parseISO(overdueActiveWeek.week_start), "d 'de' MMMM", { locale: es })} ha terminado</strong>
-            <p>Revisa las actividades registradas y prepara la siguiente semana con los datos reales.</p>
+          <div className="dashboard__weekly-review-copy">
+            <span>Acción pendiente</span>
+            <strong>Revisa la semana del {format(parseISO(overdueActiveWeek.week_start), "d 'de' MMMM", { locale: es })}</strong>
+            <p>La semana está pendiente de revisión. Comprueba las actividades, completa los datos que falten y confirma la propuesta para generar la siguiente.</p>
             {advanceMessage !== null && <small>{advanceMessage}</small>}
           </div>
+          <div className="dashboard__weekly-review-actions">
+            <Link to={`/calendar?view=week&date=${overdueActiveWeek.week_start}`}>Ir al calendario</Link>
+            <Link to="/activities">Añadir actividad</Link>
           <button type="button" disabled={advanceStatus === "loading"} onClick={() => void openWeeklyReview()}>
-            {advanceStatus === "loading" ? "Preparando…" : "Revisar semana y preparar la siguiente"}
+            {advanceStatus === "loading" ? "Preparando…" : "Revisar semana"}
           </button>
+          </div>
         </section>
       )}
 

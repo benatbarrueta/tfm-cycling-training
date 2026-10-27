@@ -180,6 +180,27 @@ def get_plan(db: Session, user_id: UUID, plan_id: UUID | None = None):
     return db.scalar(query)
 
 
+def mark_overdue_week_pending_review(
+    db: Session,
+    user_id: UUID,
+    reference: date | None = None,
+) -> SeasonPlan | None:
+    """Move an elapsed active week to review without closing or adapting it."""
+    plan = get_plan(db, user_id)
+    if plan is None:
+        return None
+    today = reference or date.today()
+    changed = False
+    for week in plan.weeks:
+        if week.status == "ACTIVE" and week.week_end < today:
+            week.status = "PENDING_REVIEW"
+            changed = True
+    if changed:
+        db.commit()
+        return get_plan(db, user_id, plan.id)
+    return plan
+
+
 def list_plans(db: Session, user_id: UUID) -> list[SeasonPlan]:
     return list(
         db.scalars(
@@ -230,7 +251,11 @@ def preview_week_review(
         raise LookupError("No hay un plan activo.")
     today = reference or date.today()
     overdue = sorted(
-        [week for week in plan.weeks if week.status == "ACTIVE" and week.week_end < today],
+        [
+            week
+            for week in plan.weeks
+            if week.status in {"ACTIVE", "PENDING_REVIEW"} and week.week_end < today
+        ],
         key=lambda item: item.position,
     )
     if not overdue:
@@ -273,7 +298,7 @@ def preview_week_review(
             candidate
             for candidate in plan.weeks
             if candidate.position >= week.position
-            and candidate.status in {"ACTIVE", "PROVISIONAL"}
+            and candidate.status in {"ACTIVE", "PENDING_REVIEW", "PROVISIONAL"}
             and candidate.week_end < today
         ]),
     }
@@ -497,7 +522,10 @@ def advance_plan(
 
     today = reference or date.today()
     weeks = sorted(plan.weeks, key=lambda item: item.position)
-    active_week = next((week for week in weeks if week.status == "ACTIVE"), None)
+    active_week = next(
+        (week for week in weeks if week.status == "PENDING_REVIEW"),
+        next((week for week in weeks if week.status == "ACTIVE"), None),
+    )
     latest_event = db.scalar(
         select(AdaptationEvent)
         .where(AdaptationEvent.season_plan_id == plan.id)

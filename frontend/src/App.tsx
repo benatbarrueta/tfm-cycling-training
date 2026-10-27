@@ -62,15 +62,6 @@ function AppRoutes({ auth }: AppRoutesProps) {
     <>
       <ScrollToTop />
       <PageTitle />
-      {auth.isAuthenticated && (
-        <AppHeader user={auth.user} onSignOut={signOut} signingOut={signingOut} />
-      )}
-      {auth.user?.is_demo && (
-        <div className="demo-banner" role="status">
-          Estás utilizando Veloform en modo demostración.
-        </div>
-      )}
-
       <Routes>
         <Route
           element={
@@ -86,7 +77,12 @@ function AppRoutes({ auth }: AppRoutesProps) {
         <Route
           element={
             <SeasonPlanProvider>
-              <PrivateRoutes isAuthenticated={auth.isAuthenticated} />
+              <PrivateRoutes
+                isAuthenticated={auth.isAuthenticated}
+                user={auth.user}
+                onSignOut={signOut}
+                signingOut={signingOut}
+              />
             </SeasonPlanProvider>
           }
         >
@@ -145,10 +141,28 @@ function PublicOnly({
   );
 }
 
-function PrivateRoutes({ isAuthenticated }: { isAuthenticated: boolean }) {
+function PrivateRoutes({
+  isAuthenticated,
+  user,
+  onSignOut,
+  signingOut,
+}: {
+  isAuthenticated: boolean;
+  user: ReturnType<typeof useAuth>["user"];
+  onSignOut: () => Promise<void>;
+  signingOut: boolean;
+}) {
   const location = useLocation();
   return isAuthenticated ? (
-    <Outlet />
+    <>
+      <AppHeader user={user} onSignOut={onSignOut} signingOut={signingOut} />
+      {user?.is_demo && (
+        <div className="demo-banner" role="status">
+          Estás utilizando Veloform en modo demostración.
+        </div>
+      )}
+      <Outlet />
+    </>
   ) : (
     <Navigate to="/login" replace state={{ from: location.pathname }} />
   );

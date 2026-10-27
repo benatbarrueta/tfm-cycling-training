@@ -385,22 +385,42 @@
   }
 }
 .dashboard__weekly-review {
-  display: flex;
-  padding: 1rem 1.25rem;
+  display: grid;
+  padding: 1.15rem 1.25rem;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem;
   color: #143b2a;
   background: #e5f4ea;
   border: 1px solid #a9d4b8;
   border-radius: 0.8rem;
+  box-shadow: 0 0.4rem 1.2rem rgb(23 51 37 / 6%);
 }
 
 .dashboard__weekly-review p {
-  margin: 0.25rem 0;
+  max-width: 46rem;
+  margin: 0.35rem 0 0;
+  color: #637068;
+  line-height: 1.45;
+}
+
+.dashboard__weekly-review-copy > span {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: #27734b;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.dashboard__weekly-review-copy > strong {
+  display: block;
+  font-size: 1.05rem;
 }
 
 .dashboard__weekly-review button {
+  min-height: 2.75rem;
   padding: 0.8rem 1rem;
   color: #fff;
   background: #1f6f49;
@@ -413,6 +433,50 @@
 .dashboard__weekly-review button:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.dashboard__weekly-review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.dashboard__weekly-review-actions a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
+  align-items: center;
+  justify-content: center;
+  color: #1f6f49;
+  background: #ffffff;
+  border: 1px solid #86bea0;
+  border-radius: 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 750;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.dashboard__weekly-review-actions a:hover {
+  background: #f3faf6;
+  border-color: #27734b;
+}
+
+@media (max-width: 760px) {
+  .dashboard__weekly-review,
+  .dashboard__weekly-review-actions {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .dashboard__weekly-review-actions a,
+  .dashboard__weekly-review-actions button {
+    width: 100%;
+  }
 }
 
 .dashboard__review-overlay {

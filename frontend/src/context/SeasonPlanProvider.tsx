@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { advanceCurrentSeasonPlan, createSeasonPlan, getCurrentSeasonPlan, type SeasonPlan } from "../api/seasonPlans";
 import type { ApiError } from "../api/client";
 import { SeasonPlanContext, type SeasonPlanStatus } from "./seasonPlanContext";
+import { getSimulatedDate } from "../lib/temporal";
 
 export function SeasonPlanProvider({ children }: { children: React.ReactNode }) {
   const [plan, setPlan] = useState<SeasonPlan | null>(null);
@@ -11,7 +12,7 @@ export function SeasonPlanProvider({ children }: { children: React.ReactNode }) 
   const refresh = useCallback(async () => {
     setStatus("loading");
     try {
-      setPlan(await getCurrentSeasonPlan());
+      setPlan(await getCurrentSeasonPlan(getSimulatedDate()));
       setStatus("ready");
       setError(null);
     } catch (cause) {
@@ -46,7 +47,7 @@ export function SeasonPlanProvider({ children }: { children: React.ReactNode }) 
         ),
       });
     } else {
-      setPlan(await getCurrentSeasonPlan());
+      setPlan(await getCurrentSeasonPlan(getSimulatedDate()));
     }
     setStatus("ready");
     setError(null);
@@ -55,7 +56,7 @@ export function SeasonPlanProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     let active = true;
-    void getCurrentSeasonPlan()
+    void getCurrentSeasonPlan(getSimulatedDate())
       .then((value) => {
         if (!active) return;
         setPlan(value);

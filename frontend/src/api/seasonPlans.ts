@@ -131,8 +131,8 @@ export interface SeasonPlan {
   weeks: PlannedWeek[];
 }
 
-export function getCurrentSeasonPlan() {
-  return apiRequest<SeasonPlan>("/api/season-plans/current");
+export function getCurrentSeasonPlan(referenceDate?: string | null) {
+  return apiRequest<SeasonPlan>(withReferenceDate("/api/season-plans/current", referenceDate));
 }
 
 export function listSeasonPlans() {

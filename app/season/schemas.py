@@ -21,6 +21,7 @@ class PhaseType(str, Enum):
 class WeekStatus(str, Enum):
     PROVISIONAL = "PROVISIONAL"
     ACTIVE = "ACTIVE"
+    PENDING_REVIEW = "PENDING_REVIEW"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 

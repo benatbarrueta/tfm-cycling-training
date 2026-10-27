@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import type { AuthenticatedUser } from "../api/types";
 import appIcon from "../assets/favicon.ico";
+import { useSeasonPlan } from "../hooks/useSeasonPlan";
 import "../styles/AppHeader.css";
 
 const navigationItems = [
@@ -20,6 +21,8 @@ interface AppHeaderProps {
 
 export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { plan } = useSeasonPlan();
+  const pendingReviews = plan?.weeks.filter((week) => week.status === "PENDING_REVIEW").length ?? 0;
   const initials = user?.display_name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() ?? "VF";
   return (
     <header className="app-header">
@@ -64,6 +67,17 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
             </NavLink>
           ))}
         </nav>
+
+        {pendingReviews > 0 && (
+          <Link
+            className="app-header__review-notification"
+            to="/dashboard"
+            aria-label={`${pendingReviews} semana pendiente de revisión`}
+          >
+            <span aria-hidden="true">●</span>
+            {pendingReviews} {pendingReviews === 1 ? "revisión pendiente" : "revisiones pendientes"}
+          </Link>
+        )}
 
         <button
           className={[

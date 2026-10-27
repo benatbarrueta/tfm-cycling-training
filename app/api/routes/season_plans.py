@@ -23,6 +23,7 @@ from app.season.service import (
     get_plan,
     list_adaptations,
     list_plans,
+    mark_overdue_week_pending_review,
     preview_week_review,
     recalculate_week_review,
 )
@@ -50,8 +51,15 @@ def create_season_plan(
 
 
 @router.get("/current", response_model=SeasonPlanRead)
-def current_plan(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> SeasonPlanRead:
-    plan = get_plan(db, user.id)
+def current_plan(
+    reference_date: date | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> SeasonPlanRead:
+    if reference_date is not None and settings.app_env != "development":
+        raise HTTPException(status_code=404, detail="Recurso no encontrado.")
+    plan = mark_overdue_week_pending_review(db, user.id, reference=reference_date)
     if plan is None:
         raise HTTPException(status_code=404, detail="No hay un plan activo.")
     return plan

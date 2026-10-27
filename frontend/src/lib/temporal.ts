@@ -68,6 +68,7 @@ export function getWeekLabel(
     return "Semana activa";
   }
   if (status === "COMPLETED") return "Semana completada";
+  if (status === "PENDING_REVIEW") return "Semana pendiente de revisión";
   if (status === "PROVISIONAL") return "Semana provisional";
   if (temporalState === "PAST") return "Semana pasada";
   return "Semana activa";

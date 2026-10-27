@@ -1047,8 +1047,10 @@ El proyecto presenta actualmente estas limitaciones:
   interválicas o muy variables.
 - La clasificación del 5 % simplifica una respuesta fisiológica continua.
 - La política de adaptación no representa una validación clínica.
-- El cierre semanal requiere actualmente una acción explícita del usuario; no
-  existe todavía un proceso programado que lo ejecute en segundo plano.
+- La semana vencida pasa automáticamente a revisión al abrir la aplicación;
+  el cierre requiere confirmación para permitir corregir o importar actividades.
+- La detección funciona al consultar el plan. Un aviso externo sin abrir la
+  aplicación requeriría un proceso programado en el entorno de despliegue.
 - La generalización debe evaluarse con más atletas y datos externos.
 
 ## Estado actual
@@ -1078,6 +1080,10 @@ Están implementados:
 - Regeneración adaptativa de la siguiente semana.
 - Evolución basada en revisiones reales persistidas.
 - Vista previa del cierre semanal y aviso de datos incompletos.
+- Detección automática de semanas vencidas y estado `PENDING_REVIEW`.
+- Aviso global de revisión pendiente sin cerrar la semana automáticamente.
+- Importación revisable de actividades FIT y TCX con control de duplicados.
+- Adaptación alternativa por cumplimiento, duración y RPE sin mezclar escalas.
 - Historial permanente de adaptaciones y temporadas finalizadas.
 - Detalle de cada semana con comparación provisional frente a adaptada.
 - Resumen serializable del plan.
@@ -1087,8 +1093,9 @@ Están implementados:
 
 Los siguientes desarrollos previstos son:
 
-1. Automatizar el cierre semanal con un proceso programado y notificaciones.
-2. Importar actividades desde FIT, TCX, GoldenCheetah o servicios externos.
+1. Añadir un proceso programado y notificaciones externas para avisar sin que
+   el usuario tenga que abrir la aplicación.
+2. Conectar la importación con GoldenCheetah o servicios externos.
 3. Ampliar el número y variedad de atletas.
 4. Evaluar la calibración temporal en ciclistas conocidos.
 5. Analizar por separado sesiones continuas e interválicas.
