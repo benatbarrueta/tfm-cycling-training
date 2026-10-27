@@ -79,6 +79,15 @@
   color: #637068;
 }
 
+.week-detail__review header .week-detail__adaptation-note {
+  padding: 0.75rem 0.9rem;
+  color: #684b13;
+  background: #fff6df;
+  border-left: 3px solid #e9a83a;
+  border-radius: 0.35rem;
+  font-weight: 700;
+}
+
 .week-detail__review dl {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

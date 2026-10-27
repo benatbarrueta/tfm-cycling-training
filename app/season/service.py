@@ -419,6 +419,7 @@ def _decision_reason(
     adapted_target_tss: float | None,
     adaptation_method: str,
     median_perceived_exertion: float | None,
+    workout_completion_rate: float,
 ) -> str:
     response_text = {
         "ELEVATED": "La respuesta aeróbica registrada fue elevada",
@@ -460,6 +461,15 @@ def _decision_reason(
             f" La previsión de temporada era {provisional_target_tss:.1f} TSS "
             f"y la revisión solicitó {requested_target_tss:.1f} TSS."
         )
+        if (
+            adaptation_method == RPE_FALLBACK
+            and workout_completion_rate < 0.6
+            and requested_target_tss < provisional_target_tss
+        ):
+            reason += (
+                f" El incremento provisional se canceló por bajo cumplimiento "
+                f"({workout_completion_rate * 100:.0f} % de las sesiones vinculadas)."
+            )
     if (
         requested_target_tss is not None
         and adapted_target_tss is not None
@@ -579,6 +589,7 @@ def advance_plan(
         adapted_target,
         method,
         completion.median_perceived_exertion,
+        completion.workout_completion_rate,
     )
 
     review = WeeklyReview(

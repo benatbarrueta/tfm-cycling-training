@@ -38,6 +38,16 @@ export function WeekDetailPage() {
   const adapted = week.adapted_target_tss;
   const difference = adapted === null ? null : adapted - provisional;
   const percentage = difference === null || provisional === 0 ? null : (difference / provisional) * 100;
+  const nextWeek = displayedPlan?.weeks.find((item) => item.position === week.position + 1);
+  const nextTarget = nextWeek?.requested_target_tss ?? nextWeek?.adapted_target_tss ?? null;
+  const cancelledProvisionalIncrease =
+    week.review !== null &&
+    week.review.adaptation_method === "RPE_FALLBACK" &&
+    week.review.planned_workout_count > 0 &&
+    week.review.completed_workout_count / week.review.planned_workout_count < 0.6 &&
+    nextWeek !== undefined &&
+    nextTarget !== null &&
+    nextWeek.provisional_target_tss > nextTarget;
 
   return (
     <main className="week-detail">
@@ -53,20 +63,29 @@ export function WeekDetailPage() {
 
       <section className="week-detail__comparison">
         <article><span>Previsión de temporada</span><strong>{provisional.toFixed(0)} TSS</strong></article>
-        <article><span>Objetivo tras la revisión</span><strong>{week.requested_target_tss?.toFixed(0) ?? "Pendiente"}{week.requested_target_tss === null ? "" : " TSS"}</strong></article>
-        <article><span>Plan factible generado</span><strong>{adapted?.toFixed(0) ?? "Pendiente"}{adapted === null ? "" : " TSS"}</strong></article>
+        <article><span>Objetivo al activar la semana</span><strong>{week.requested_target_tss?.toFixed(0) ?? "Pendiente"}{week.requested_target_tss === null ? "" : " TSS"}</strong></article>
+        <article><span>Plan factible de esta semana</span><strong>{adapted?.toFixed(0) ?? "Pendiente"}{adapted === null ? "" : " TSS"}</strong></article>
         <article>
-          <span>Cambio</span>
+          <span>Ajuste al activar</span>
           <strong>{difference === null ? "Pendiente" : `${difference >= 0 ? "+" : ""}${difference.toFixed(0)} TSS`}</strong>
           {percentage !== null && <small>{percentage >= 0 ? "+" : ""}{percentage.toFixed(1)} %</small>}
         </article>
-        <article><span>Decisión</span><strong>{week.load_decision ? decisionLabels[week.load_decision as keyof typeof decisionLabels] : "Sin determinar"}</strong></article>
+        <article><span>Decisión al generar esta semana</span><strong>{week.load_decision ? decisionLabels[week.load_decision as keyof typeof decisionLabels] : "Sin determinar"}</strong></article>
       </section>
 
       {week.review !== null && (
         <section className="week-detail__review">
-          <header><h2>Resultado de la semana</h2><p>{week.review.decision_reason}</p></header>
+          <header>
+            <h2>Resultado de la semana</h2>
+            <p>{week.review.decision_reason}</p>
+            {cancelledProvisionalIncrease && (
+              <p className="week-detail__adaptation-note">
+                Se canceló el incremento provisional de {nextWeek.provisional_target_tss.toFixed(0)} a {nextTarget.toFixed(0)} TSS por bajo cumplimiento.
+              </p>
+            )}
+          </header>
           <dl>
+            <div><dt>Decisión para la siguiente semana</dt><dd>{week.review.load_decision ? decisionLabels[week.review.load_decision as keyof typeof decisionLabels] : "Sin determinar"}</dd></div>
             <div><dt>Método de adaptación</dt><dd>{week.review.adaptation_method === "POWER_TSS" ? "Potencia y TSS" : week.review.adaptation_method === "RPE_FALLBACK" ? "Cumplimiento, duración y RPE" : "Datos insuficientes"}</dd></div>
             <div><dt>TSS realizado</dt><dd>{week.review.registered_tss.toFixed(0)} / {week.review.planned_tss.toFixed(0)}</dd></div>
             <div><dt>Carga estimada</dt><dd>{week.review.registered_rpe_load.toFixed(0)} RPE·min</dd></div>
