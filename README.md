@@ -1077,6 +1077,16 @@ metadatos y rangos agregados. No contiene filas ni identificadores de atletas.
 Los informes versionados deben evitar datos personales y contener únicamente
 resultados necesarios para reproducir o documentar los experimentos.
 
+## Flujo de contribución
+
+Los cambios se desarrollan en una rama y se incorporan a `main` mediante una
+pull request. GitHub Actions valida automáticamente el backend y el frontend
+en cada push. La rama principal exige que ambos checks terminen correctamente
+y que las conversaciones estén resueltas antes del merge.
+
+Se recomienda usar squash merge para conservar un único commit por cambio. Las
+ramas remotas ya fusionadas pueden eliminarse automáticamente.
+
 ## Limitaciones
 
 El proyecto presenta actualmente estas limitaciones:
