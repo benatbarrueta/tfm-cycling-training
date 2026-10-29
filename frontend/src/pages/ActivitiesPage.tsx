@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   commitActivityImport,
@@ -24,6 +24,7 @@ function metric(value: number | null, suffix = "") {
 export function ActivitiesPage() {
   const [searchParams] = useSearchParams();
   const handledEditId = useRef<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const { activities, total, status, error, refresh, addActivity, editActivity, removeActivity, linkActivity } = useActivities({ limit: 50 });
   const [editing, setEditing] = useState<Activity | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -31,6 +32,7 @@ export function ActivitiesPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [importPreview, setImportPreview] = useState<ActivityImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
+  const [draggingFile, setDraggingFile] = useState(false);
 
   useEffect(() => {
     const editId = searchParams.get("edit");
@@ -45,6 +47,23 @@ export function ActivitiesPage() {
         setMessage(cause instanceof Error ? cause.message : "No se ha podido abrir la actividad.");
       });
   }, [searchParams]);
+
+  useEffect(() => {
+    if (importPreview === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setImportPreview(null);
+        setFormError(null);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [importPreview]);
 
   async function deleteItem(activity: Activity) {
     if (!window.confirm(`¿Eliminar "${activity.title}" del historial?`)) return;
@@ -79,28 +98,75 @@ export function ActivitiesPage() {
     }
   }
 
+  function handleImportDrop(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setDraggingFile(false);
+    if (importing) return;
+    void selectImportFile(event.dataTransfer.files[0]);
+  }
+
+  function openImportPicker(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    importInputRef.current?.click();
+  }
+
+  function closeImportPreview() {
+    setImportPreview(null);
+    setFormError(null);
+  }
+
   return (
     <main className="activities-page">
       <header className="activities-page__header">
         <div><p className="activities-page__eyebrow">Historial</p><h1>Actividades</h1><p>Añade tus entrenamientos para que el sistema pueda calcular tu carga y adaptar el plan.</p></div>
         <div className="activities-page__header-actions">
-          <label className="button activities-page__import-button">
-            {importing ? "Analizando…" : "Importar FIT/TCX"}
-            <input
-              type="file"
-              accept=".fit,.tcx"
-              disabled={importing}
-              onChange={(event) => {
-                void selectImportFile(event.target.files?.[0]);
-                event.target.value = "";
-              }}
-            />
-          </label>
           <button className="button button--primary activities-page__add-button" type="button" onClick={() => { setImportPreview(null); setEditing(null); setShowForm((value) => !value); }}>
             {showForm ? "Cerrar formulario" : "＋ Añadir actividad"}
           </button>
         </div>
       </header>
+      <section
+        className={`activities-page__drop-zone${draggingFile ? " activities-page__drop-zone--active" : ""}${importing ? " activities-page__drop-zone--busy" : ""}`}
+        aria-label="Importar una actividad FIT o TCX"
+        aria-busy={importing}
+        role="button"
+        tabIndex={0}
+        onClick={() => importInputRef.current?.click()}
+        onKeyDown={openImportPicker}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          if (!importing) setDraggingFile(true);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = importing ? "none" : "copy";
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setDraggingFile(false);
+          }
+        }}
+        onDrop={handleImportDrop}
+      >
+        <input
+          ref={importInputRef}
+          className="visually-hidden"
+          type="file"
+          accept=".fit,.tcx"
+          disabled={importing}
+          tabIndex={-1}
+          onChange={(event) => {
+            void selectImportFile(event.target.files?.[0]);
+            event.target.value = "";
+          }}
+        />
+        <span className="activities-page__drop-icon" aria-hidden="true">⇩</span>
+        <div>
+          <strong>{importing ? "Analizando actividad…" : draggingFile ? "Suelta el archivo para analizarlo" : "Arrastra aquí tu actividad"}</strong>
+          <span>Archivos FIT o TCX · También puedes pulsar para seleccionarlo</span>
+        </div>
+      </section>
       <section className="activities-page__summary" aria-label="Resumen del historial">
         <article><strong>{total}</strong><span>actividades</span></article>
         <article><strong>{tss.toFixed(0)}</strong><span>TSS cargado</span></article>
@@ -108,35 +174,49 @@ export function ActivitiesPage() {
         <article><strong>{activities.filter((item) => item.aerobic_decoupling !== null).length}</strong><span>con desacoplamiento</span></article>
       </section>
       {importPreview !== null && (
-        <section className="activities-page__import-preview">
-          <header>
-            <div>
-              <p className="activities-page__eyebrow">Archivo analizado</p>
-              <h2>Revisa la actividad antes de importarla</h2>
-              <p>{importPreview.filename}</p>
+        <div className="activities-page__import-overlay" role="presentation" onMouseDown={closeImportPreview}>
+          <section
+            className="activities-page__import-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="activity-import-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p className="activities-page__eyebrow">Archivo analizado</p>
+                <h2 id="activity-import-title">Revisa la actividad antes de importarla</h2>
+                <p>{importPreview.filename}</p>
+              </div>
+              <div className="activities-page__import-dialog-actions">
+                {importPreview.duplicate && <strong>Este archivo ya se había importado</strong>}
+                <button type="button" onClick={closeImportPreview} aria-label="Cerrar importación" autoFocus>×</button>
+              </div>
+            </header>
+            <div className="activities-page__import-dialog-body">
+              {formError && <p className="activities-page__import-error" role="alert">{formError}</p>}
+              <ActivityForm
+                initialValues={{
+                  ...importPreview.activity,
+                  started_at: localDateTime(importPreview.activity.started_at),
+                }}
+                submitLabel="Confirmar importación"
+                fieldWarnings={importPreview.warnings ?? {}}
+                onCancel={closeImportPreview}
+                onSubmit={async (input, plannedWorkoutId) => {
+                  try {
+                    await commitActivityImport(importPreview, input, plannedWorkoutId);
+                    await refresh();
+                    closeImportPreview();
+                    setMessage("Actividad importada correctamente.");
+                  } catch (cause) {
+                    setFormError(cause instanceof Error ? cause.message : "No se ha podido importar la actividad.");
+                  }
+                }}
+              />
             </div>
-            {importPreview.duplicate && <strong>Este archivo ya se había importado</strong>}
-          </header>
-          <ActivityForm
-            initialValues={{
-              ...importPreview.activity,
-              started_at: localDateTime(importPreview.activity.started_at),
-            }}
-            submitLabel="Confirmar importación"
-            onCancel={() => setImportPreview(null)}
-            onSubmit={async (input, plannedWorkoutId) => {
-              try {
-                await commitActivityImport(importPreview, input, plannedWorkoutId);
-                await refresh();
-                setImportPreview(null);
-                setFormError(null);
-                setMessage("Actividad importada correctamente.");
-              } catch (cause) {
-                setFormError(cause instanceof Error ? cause.message : "No se ha podido importar la actividad.");
-              }
-            }}
-          />
-        </section>
+          </section>
+        </div>
       )}
       {(showForm || editing) && (
         <ActivityForm
@@ -167,7 +247,9 @@ export function ActivitiesPage() {
           }}
         />
       )}
-      {formError && <p role="alert">{formError}</p>}
+      {formError && importPreview === null && (
+        <p className="activities-page__page-error" role="alert">{formError}</p>
+      )}
       {message && <p role="status">{message}</p>}
       <section className="activities-page__history">
         <header><div><h2>Historial reciente</h2><p>Las actividades se ordenan desde la más reciente.</p></div><span className="activities-page__history-note">Guardadas en tu cuenta</span></header>

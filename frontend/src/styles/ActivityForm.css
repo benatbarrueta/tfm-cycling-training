@@ -133,3 +133,13 @@
     grid-template-columns: 1fr;
   }
 }
+.activity-form__field-warning {
+  display: block;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.7rem;
+  color: #72500d !important;
+  background: #fff7df;
+  border-left: 3px solid #e8ad32;
+  border-radius: 0.4rem;
+  line-height: 1.4;
+}

@@ -18,6 +18,7 @@ interface ActivityFormProps {
   onSubmit: (activity: ActivityInput, plannedWorkoutId: string | null) => Promise<void>;
   onCancel?: () => void;
   submitLabel?: string;
+  fieldWarnings?: Partial<Record<keyof ActivityFormValues, string>>;
 }
 
 function toIso(value: string): string {
@@ -28,7 +29,7 @@ function valueOrNull(value: number | null): number | null {
   return value === null || Number.isNaN(value) ? null : value;
 }
 
-export function ActivityForm({ initialValues, initialPlannedWorkoutId = null, activityId, onSubmit, onCancel, submitLabel = "Guardar actividad" }: ActivityFormProps) {
+export function ActivityForm({ initialValues, initialPlannedWorkoutId = null, activityId, onSubmit, onCancel, submitLabel = "Guardar actividad", fieldWarnings }: ActivityFormProps) {
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<ActivityFormInput, unknown, ActivityFormValues>({
     resolver: zodResolver(activitySchema),
     defaultValues: {
@@ -149,6 +150,9 @@ export function ActivityForm({ initialValues, initialPlannedWorkoutId = null, ac
               <small className="activity-form__hint">
                 Úsalo si no tienes TSS: 1 es muy suave y 10 es un esfuerzo máximo.
               </small>
+            )}
+            {fieldWarnings?.[name] && (
+              <small className="activity-form__field-warning">{fieldWarnings[name]}</small>
             )}
             {errors[name] && <small>{errors[name]?.message}</small>}
           </label>

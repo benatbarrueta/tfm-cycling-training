@@ -58,6 +58,7 @@ export interface ActivityImportPreview {
   fingerprint: string;
   duplicate: boolean;
   activity: ActivityInput;
+  warnings: Record<string, string>;
 }
 
 export function listActivities(filters: ActivityFilters = {}) {

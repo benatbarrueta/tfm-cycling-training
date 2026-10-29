@@ -113,6 +113,7 @@ class ActivityImportPreview(BaseModel):
     fingerprint: str
     duplicate: bool
     activity: ActivityCreate
+    warnings: dict[str, str] = Field(default_factory=dict)
 
 
 class ActivityImportCommit(ActivityCreate):

@@ -61,7 +61,12 @@ def preview_import(
     db: Session = Depends(get_db),
 ) -> ActivityImportPreview:
     try:
-        activity, fingerprint = preview_activity_file(content, filename)
+        profile = get_profile(db, user.id)
+        activity, fingerprint, warnings = preview_activity_file(
+            content,
+            filename,
+            ftp=profile.ftp if profile is not None else None,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ActivityImportPreview(
@@ -69,6 +74,7 @@ def preview_import(
         fingerprint=fingerprint,
         duplicate=repository.get_import_by_fingerprint(db, user.id, fingerprint) is not None,
         activity=ActivityCreate.model_validate(activity),
+        warnings=warnings,
     )
 
 
