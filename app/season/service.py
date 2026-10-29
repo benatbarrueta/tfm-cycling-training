@@ -62,7 +62,12 @@ def phase_distribution(weeks: int) -> list[int]:
 
 
 def _activity_domains(db: Session, user_id: UUID, timezone_name: str):
-    records = db.scalars(select(ActivityRecord).where(ActivityRecord.user_id == user_id)).all()
+    records = db.scalars(
+        select(ActivityRecord).where(
+            ActivityRecord.user_id == user_id,
+            ActivityRecord.external_status == "ACTIVE",
+        )
+    ).all()
     return [to_domain_activity(record, timezone_name) for record in records]
 
 
@@ -266,6 +271,7 @@ def preview_week_review(
         db.scalars(
             select(ActivityRecord).where(
                 ActivityRecord.user_id == user_id,
+                ActivityRecord.external_status == "ACTIVE",
                 ActivityRecord.started_at >= utc_start,
                 ActivityRecord.started_at < utc_end,
             )
@@ -577,6 +583,7 @@ def advance_plan(
         db.scalars(
             select(ActivityRecord).where(
                 ActivityRecord.user_id == user.id,
+                ActivityRecord.external_status == "ACTIVE",
                 ActivityRecord.started_at >= utc_start,
                 ActivityRecord.started_at < utc_end,
             )
@@ -702,6 +709,7 @@ def recalculate_week_review(
         db.scalars(
             select(ActivityRecord).where(
                 ActivityRecord.user_id == user_id,
+                ActivityRecord.external_status == "ACTIVE",
                 ActivityRecord.started_at >= utc_start,
                 ActivityRecord.started_at < utc_end,
             )

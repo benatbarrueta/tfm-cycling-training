@@ -139,6 +139,7 @@ class ActivityRecord(Base):
     aerobic_decoupling: Mapped[float | None] = mapped_column(Float)
     source: Mapped[str] = mapped_column(String(32), nullable=False)
     external_source_id: Mapped[str | None] = mapped_column(String(255))
+    external_status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
     notes: Mapped[str | None] = mapped_column(String(4000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

@@ -3,6 +3,7 @@ from statistics import mean
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.activities.file_import import _complete_power_metrics, _decoupling, _normalized_power
@@ -343,4 +344,147 @@ def sync_strava_activities(
         failed=connection.sync_failed,
         start_date=start_date,
         last_error=connection.sync_last_error,
+    )
+
+
+def sync_incremental_strava_activities(
+    db: Session,
+    user_id: UUID,
+    connection: ExternalConnection,
+    client: StravaClient,
+    cipher: TokenCipher,
+    *,
+    timezone_name: str,
+    ftp: float,
+) -> StravaSyncResult:
+    if not connection.sync_enabled or connection.sync_start_date is None:
+        return StravaSyncResult(
+            status="NOT_CONFIGURED",
+            total=0,
+            imported=0,
+            skipped=0,
+            failed=0,
+            start_date=datetime.now(ZoneInfo(timezone_name)).date(),
+        )
+
+    zone = ZoneInfo(timezone_name)
+    configured_start = datetime.combine(connection.sync_start_date, time.min, zone)
+    if connection.sync_cursor_at is None:
+        range_start = configured_start
+    else:
+        cursor = connection.sync_cursor_at.replace(tzinfo=timezone.utc).astimezone(zone)
+        range_start = max(configured_start, cursor - timedelta(days=7))
+
+    after = int(range_start.timestamp())
+    before = int((datetime.now(timezone.utc) + timedelta(days=1)).timestamp())
+    access_token = valid_access_token(db, connection, client, cipher)
+    raw_items: list[dict] = []
+    imported = 0
+    skipped = 0
+    failed = 0
+    last_error: str | None = None
+    latest_started_at = connection.sync_cursor_at
+    connection.sync_status = "RUNNING"
+    db.commit()
+    try:
+        page = 1
+        while True:
+            batch = client.list_athlete_activities(
+                access_token,
+                after=after,
+                before=before,
+                page=page,
+                per_page=100,
+            )
+            raw_items.extend(
+                item
+                for item in batch
+                if str(item.get("sport_type") or item.get("type") or "") in CYCLING_TYPES
+            )
+            if len(batch) < 100:
+                break
+            page += 1
+            if page > 100:
+                raise ValueError("El intervalo contiene demasiadas actividades para una sola sincronización.")
+
+        existing = imported_external_ids(
+            db,
+            user_id,
+            "STRAVA",
+            {str(item.get("id")) for item in raw_items if item.get("id") is not None},
+        )
+        visible_external_ids = {
+            str(item.get("id"))
+            for item in raw_items
+            if item.get("id") is not None
+        }
+        range_start_utc = range_start.astimezone(timezone.utc).replace(tzinfo=None)
+        range_end_utc = datetime.fromtimestamp(before, timezone.utc).replace(tzinfo=None)
+        stored_in_range = list(
+            db.scalars(
+                select(ActivityRecord).where(
+                    ActivityRecord.user_id == user_id,
+                    ActivityRecord.source == "EXTERNAL",
+                    ActivityRecord.started_at >= range_start_utc,
+                    ActivityRecord.started_at < range_end_utc,
+                )
+            )
+        )
+        for stored in stored_in_range:
+            if stored.external_source_id in visible_external_ids:
+                stored.external_status = "ACTIVE"
+            else:
+                stored.external_status = "DELETED_AT_SOURCE"
+                stored.planned_workout_id = None
+        for summary in raw_items:
+            external_id = str(summary.get("id") or "")
+            if not external_id or external_id in existing:
+                skipped += 1
+                continue
+            try:
+                detail = client.get_activity(access_token, external_id)
+                streams = client.get_activity_streams(access_token, external_id)
+                activity = _build_activity_record(
+                    db,
+                    user_id,
+                    detail,
+                    streams,
+                    timezone_name=timezone_name,
+                    ftp=ftp,
+                )
+                db.add(activity)
+                db.flush()
+                imported += 1
+                existing.add(external_id)
+                if latest_started_at is None or activity.started_at > latest_started_at:
+                    latest_started_at = activity.started_at
+            except (StravaAuthenticationError, StravaRateLimitError, StravaUnavailableError):
+                raise
+            except (StravaError, KeyError, TypeError, ValueError):
+                failed += 1
+                last_error = f"No se pudo importar la actividad {external_id}."
+
+        connection.sync_cursor_at = latest_started_at
+        connection.last_sync_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        connection.sync_status = "COMPLETED_WITH_ERRORS" if failed else "COMPLETED"
+        connection.sync_total += imported
+        connection.sync_imported += imported
+        connection.sync_failed = failed
+        connection.sync_last_error = last_error
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        connection.sync_status = "FAILED"
+        connection.sync_last_error = str(exc)[:1000]
+        db.commit()
+        raise
+
+    return StravaSyncResult(
+        status=connection.sync_status,
+        total=len(raw_items),
+        imported=imported,
+        skipped=skipped,
+        failed=failed,
+        start_date=range_start.date(),
+        last_error=last_error,
     )

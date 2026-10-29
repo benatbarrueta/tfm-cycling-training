@@ -770,3 +770,18 @@
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 }
+
+.calendar-page__strava-status {
+  margin: 0 auto 1rem;
+  max-width: 72rem;
+  padding: 0.65rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--color-green-50, #eaf6ef);
+  color: var(--color-green-800, #185c3a);
+  font-weight: 650;
+}
+
+.calendar-page__strava-status--error {
+  background: #fff4df;
+  color: #79520b;
+}

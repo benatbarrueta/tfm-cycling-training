@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
@@ -21,7 +21,11 @@ from app.integrations.schemas import (
     StravaSyncRequest,
     StravaSyncResult,
 )
-from app.integrations.service import list_strava_activities, sync_strava_activities
+from app.integrations.service import (
+    list_strava_activities,
+    sync_incremental_strava_activities,
+    sync_strava_activities,
+)
 from app.integrations.strava import (
     StravaAuthenticationError,
     StravaClient,
@@ -211,3 +215,60 @@ def start_strava_sync(
         raise HTTPException(status_code=503, detail="Strava no está disponible en este momento. Inténtalo de nuevo más tarde.") from exc
     except (StravaError, ValueError) as exc:
         raise HTTPException(status_code=502, detail="No se ha podido completar la sincronización con Strava.") from exc
+
+
+@router.post("/strava/sync/incremental", response_model=StravaSyncResult)
+def sync_strava_incrementally(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> StravaSyncResult:
+    connection = get_connection(db, user.id, "STRAVA")
+    profile = get_profile(db, user.id)
+    today = datetime.now(ZoneInfo(profile.timezone if profile else "UTC")).date()
+    fallback = StravaSyncResult(
+        status="NOT_CONFIGURED",
+        total=0,
+        imported=0,
+        skipped=0,
+        failed=0,
+        start_date=today,
+    )
+    if (
+        connection is None
+        or connection.status != "CONNECTED"
+        or not connection.sync_enabled
+        or connection.sync_start_date is None
+        or profile is None
+    ):
+        return fallback
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    last_sync_at = connection.last_sync_at
+    if last_sync_at is not None and last_sync_at.tzinfo is not None:
+        last_sync_at = last_sync_at.astimezone(timezone.utc).replace(tzinfo=None)
+    if last_sync_at is not None and now - last_sync_at < timedelta(minutes=5):
+        return fallback.model_copy(
+            update={"status": "SKIPPED_RECENT", "start_date": connection.sync_start_date}
+        )
+    if connection.sync_status in {"PENDING", "RUNNING"}:
+        return fallback.model_copy(
+            update={"status": "SKIPPED_RUNNING", "start_date": connection.sync_start_date}
+        )
+    try:
+        return sync_incremental_strava_activities(
+            db,
+            user.id,
+            connection,
+            _strava(settings),
+            _cipher(settings),
+            timezone_name=profile.timezone,
+            ftp=profile.ftp,
+        )
+    except StravaAuthenticationError as exc:
+        raise HTTPException(status_code=401, detail="La autorización de Strava ha caducado. Vuelve a conectar tu cuenta.") from exc
+    except StravaRateLimitError as exc:
+        raise HTTPException(status_code=429, detail="Strava ha alcanzado temporalmente su límite de consultas. Inténtalo más tarde.") from exc
+    except StravaUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="Strava no está disponible en este momento. Inténtalo de nuevo más tarde.") from exc
+    except (StravaError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="No se ha podido actualizar el calendario desde Strava.") from exc

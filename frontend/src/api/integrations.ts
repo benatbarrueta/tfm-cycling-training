@@ -91,3 +91,9 @@ export function startStravaSync(startDate: string) {
     body: JSON.stringify({ start_date: startDate }),
   });
 }
+
+export function syncStravaIncrementally() {
+  return apiRequest<StravaSyncResult>("/api/integrations/strava/sync/incremental", {
+    method: "POST",
+  });
+}

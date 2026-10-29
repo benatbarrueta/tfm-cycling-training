@@ -138,9 +138,12 @@ objetivo solo es obligatoria para el objetivo `RACE`.
 
 ### Conexión con Strava
 
-El perfil incluye una sección de aplicaciones conectadas. En esta primera
-fase Veloform puede autorizar, mostrar y desconectar una cuenta de Strava; no
-importa actividades hasta que el usuario las seleccione en un paso posterior.
+El perfil incluye una sección de aplicaciones conectadas. Veloform puede
+autorizar, mostrar y desconectar una cuenta de Strava. Tras elegir una fecha,
+importa el historial de ciclismo y, al abrir el calendario, busca actividades
+nuevas automáticamente. Las consultas incrementales tienen un intervalo mínimo
+de cinco minutos y reutilizan siete días de solapamiento para detectar cargas
+atrasadas sin crear duplicados.
 
 Para probar la conexión, crea una aplicación en
 `https://www.strava.com/settings/api`, usa `localhost` como dominio de callback

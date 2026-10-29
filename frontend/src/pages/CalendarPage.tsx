@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   addDays,
@@ -26,12 +26,14 @@ import { phaseLabels, workoutLabels } from "../lib/labels";
 import { getCurrentDate, getTodayInTimeZone, getWeekLabel, getWeekTemporalState } from "../lib/temporal";
 import { summarizeWeeklyActivities } from "../lib/weeklyActivitySummary";
 import { localDateToUtcIso } from "../lib/timezone";
+import { formatDurationMinutes } from "../lib/duration";
 import type {
   CalendarDay,
   CalendarView,
 } from "../types/calendar";
 import type { ActivityInput } from "../api/activities";
 import type { PlannedWeek, PlannedWorkout } from "../api/seasonPlans";
+import { syncStravaIncrementally } from "../api/integrations";
 import "../styles/CalendarPage.css";
 
 const statusLabels = {
@@ -174,7 +176,33 @@ export function CalendarPage() {
   const [selectedWorkout, setSelectedWorkout] = useState<PlannedWorkout | null>(null);
   const [activityFormError, setActivityFormError] = useState<string | null>(null);
 
-  const { activities, addActivity, removeActivity, linkActivity } = useActivities(activityFilters);
+  const { activities, refresh: refreshActivities, addActivity, removeActivity, linkActivity } = useActivities(activityFilters);
+  const [stravaSyncStatus, setStravaSyncStatus] = useState<"idle" | "syncing" | "updated" | "error">("idle");
+  const hasStartedStravaSync = useRef(false);
+
+  useEffect(() => {
+    if (hasStartedStravaSync.current) return;
+    hasStartedStravaSync.current = true;
+    setStravaSyncStatus("syncing");
+    syncStravaIncrementally()
+      .then(async (result) => {
+        if (result.imported > 0) {
+          await refreshActivities();
+          setStravaSyncStatus("updated");
+        } else {
+          setStravaSyncStatus("idle");
+        }
+      })
+      .catch(() => {
+        setStravaSyncStatus("error");
+      });
+  }, [refreshActivities]);
+
+  useEffect(() => {
+    if (stravaSyncStatus !== "updated") return;
+    const timeout = window.setTimeout(() => setStravaSyncStatus("idle"), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [stravaSyncStatus]);
 
   const visibleDates = useMemo(
     () => getVisibleDates(selectedDate, view),
@@ -344,6 +372,17 @@ export function CalendarPage() {
 
   return (
     <main className="calendar-page">
+      {stravaSyncStatus === "syncing" && (
+        <p className="calendar-page__strava-status" role="status">Sincronizando actividades de Strava…</p>
+      )}
+      {stravaSyncStatus === "updated" && (
+        <p className="calendar-page__strava-status" role="status">Calendario actualizado con tus nuevas actividades de Strava.</p>
+      )}
+      {stravaSyncStatus === "error" && (
+        <p className="calendar-page__strava-status calendar-page__strava-status--error" role="status">
+          No se ha podido actualizar Strava. El calendario sigue disponible y se volverá a intentar más adelante.
+        </p>
+      )}
       <CalendarToolbar
         title={getCalendarTitle(
           selectedDate,
@@ -605,8 +644,8 @@ export function CalendarPage() {
 
                   {view !== "day" && (
                     <span>
-                      {completedDuration} min ·{" "}
-                      {completedTss.toFixed(1)} TSS
+                      {formatDurationMinutes(completedDuration)}
+                      {completedTss > 0 ? ` · ${completedTss.toFixed(1)} TSS` : ""}
                     </span>
                   )}
 
@@ -614,8 +653,8 @@ export function CalendarPage() {
                     day.activities.map((activity) => (
                       <div className="calendar-day__activity-link" key={activity.id}>
                         <span>
-                          {activity.title} · {activity.duration_minutes} min
-                          {activity.tss !== null ? ` · ${activity.tss.toFixed(0)} TSS` : ""}
+                          {activity.title} · {formatDurationMinutes(activity.duration_minutes)}
+                          {activity.tss !== null && activity.tss > 0 ? ` · ${activity.tss.toFixed(0)} TSS` : ""}
                         </span>
                         {workout !== null && (
                           <button

@@ -13,6 +13,7 @@ import { StravaActivityPicker } from "../components/StravaActivityPicker";
 import { useActivities } from "../hooks/useActivities";
 import "../styles/ActivitiesPage.css";
 import { useIntegrations } from "../hooks/useIntegrations";
+import { formatDurationMinutes } from "../lib/duration";
 
 function localDateTime(value: string) {
   const date = new Date(value);
@@ -21,7 +22,7 @@ function localDateTime(value: string) {
 }
 
 function metric(value: number | null, suffix = "") {
-  return value === null ? "—" : `${value}${suffix}`;
+  return value === null || value <= 0 ? "—" : `${value}${suffix}`;
 }
 
 export function ActivitiesPage() {
@@ -195,8 +196,8 @@ export function ActivitiesPage() {
       </section>
       <section className="activities-page__summary" aria-label="Resumen del historial">
         <article><strong>{total}</strong><span>actividades</span></article>
-        <article><strong>{tss.toFixed(0)}</strong><span>TSS cargado</span></article>
-        <article><strong>{estimatedRpeLoad.toFixed(0)}</strong><span>carga estimada por RPE</span></article>
+        <article><strong>{tss > 0 ? tss.toFixed(0) : "—"}</strong><span>TSS cargado</span></article>
+        <article><strong>{estimatedRpeLoad > 0 ? estimatedRpeLoad.toFixed(0) : "—"}</strong><span>carga estimada por RPE</span></article>
         <article><strong>{activities.filter((item) => item.aerobic_decoupling !== null).length}</strong><span>con desacoplamiento</span></article>
       </section>
       {importPreview !== null && (
@@ -293,15 +294,21 @@ export function ActivitiesPage() {
                       ? "Introducida manualmente"
                       : activity.source === "FILE_IMPORT"
                         ? "Importada desde archivo"
-                        : activity.source}
+                        : activity.source === "EXTERNAL"
+                          ? "Strava"
+                          : activity.source === "GOLDENCHEETAH"
+                            ? "GoldenCheetah"
+                            : activity.source}
                   </small>
                 </td>
                 <td>{new Date(activity.started_at).toLocaleString("es-ES")}</td>
-                <td>{metric(activity.duration_minutes, " min")}</td><td>{metric(activity.distance_km, " km")}</td><td>{metric(activity.average_power, " W")}</td><td>{metric(activity.average_heart_rate, " ppm")}</td>
+                <td>{formatDurationMinutes(activity.duration_minutes)}</td><td>{metric(activity.distance_km, " km")}</td><td>{metric(activity.average_power, " W")}</td><td>{metric(activity.average_heart_rate, " ppm")}</td>
                 <td>
-                  {activity.load_source === "TSS" && `${activity.tss?.toFixed(0)} TSS`}
-                  {activity.load_source === "RPE" && `${activity.estimated_load?.toFixed(0)} RPE·min`}
-                  {activity.load_source === "UNKNOWN" && "Sin datos"}
+                  {activity.load_source === "TSS" && activity.tss !== null && activity.tss > 0
+                    ? `${activity.tss.toFixed(0)} TSS`
+                    : activity.load_source === "RPE" && activity.estimated_load !== null && activity.estimated_load > 0
+                      ? `${activity.estimated_load.toFixed(0)} RPE·min`
+                      : "Sin datos"}
                 </td>
                 <td><span className={activity.planned_workout_id === null ? "activities-page__link-status activities-page__link-status--extra" : "activities-page__link-status"}>{activity.planned_workout_id === null ? "Actividad adicional" : "Vinculada"}</span></td>
                 <td className="activities-page__actions">

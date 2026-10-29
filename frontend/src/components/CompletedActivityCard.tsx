@@ -2,6 +2,7 @@ import type {
   ActivityRecord,
 } from "../types/calendar";
 import "../styles/CompletedActivityCard.css";
+import { formatDurationMinutes } from "../lib/duration";
 
 interface CompletedActivityCardProps {
   activity: ActivityRecord;
@@ -15,6 +16,10 @@ function showMetric(
   return value === null
     ? "Sin datos"
     : `${value}${suffix}`;
+}
+
+function showPositiveMetric(value: number | null, suffix: string): string {
+  return value === null || value <= 0 ? "Sin datos" : `${value}${suffix}`;
 }
 
 export function CompletedActivityCard({
@@ -43,21 +48,21 @@ export function CompletedActivityCard({
         <div>
           <dt>Duración</dt>
           <dd>
-            {showMetric(activity.duration_minutes, " min")}
+            {formatDurationMinutes(activity.duration_minutes)}
           </dd>
         </div>
 
         <div>
           <dt>TSS</dt>
           <dd>
-            {showMetric(activity.tss, "")}
+            {showPositiveMetric(activity.tss, "")}
           </dd>
         </div>
 
         <div>
           <dt>Potencia media</dt>
           <dd>
-            {showMetric(
+            {showPositiveMetric(
               activity.average_power,
               " W",
             )}
@@ -67,7 +72,7 @@ export function CompletedActivityCard({
         <div>
           <dt>IF</dt>
           <dd>
-            {showMetric(
+            {showPositiveMetric(
               activity.intensity_factor,
               "",
             )}

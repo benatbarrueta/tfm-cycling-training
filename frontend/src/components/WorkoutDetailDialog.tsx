@@ -3,6 +3,7 @@ import { es } from "date-fns/locale";
 import type { Activity } from "../api/activities";
 import type { PlannedWorkout } from "../api/seasonPlans";
 import { workoutLabels } from "../lib/labels";
+import { formatDurationMinutes } from "../lib/duration";
 import type { WorkoutType } from "../types/training";
 
 interface WorkoutDetailDialogProps {
@@ -88,8 +89,8 @@ export function WorkoutDetailDialog({
           <section className="workout-detail__completed">
             <div><span>Actividad registrada</span><strong>{activity.title}</strong></div>
             <dl>
-              <div><dt>TSS</dt><dd>{activity.tss === null ? "Sin datos" : `${activity.tss.toFixed(0)} (${difference(activity.tss, plannedTss, "TSS")})`}</dd></div>
-              <div><dt>Duración</dt><dd>{activity.duration_minutes.toFixed(0)} min ({difference(activity.duration_minutes, plannedDuration, "min")})</dd></div>
+              <div><dt>TSS</dt><dd>{activity.tss === null || activity.tss <= 0 ? "Sin datos" : `${activity.tss.toFixed(0)} (${difference(activity.tss, plannedTss, "TSS")})`}</dd></div>
+              <div><dt>Duración</dt><dd>{formatDurationMinutes(activity.duration_minutes)} ({difference(activity.duration_minutes, plannedDuration, "min")})</dd></div>
               <div><dt>Desacoplamiento</dt><dd>{activity.aerobic_decoupling === null ? "Sin datos" : `${activity.aerobic_decoupling.toFixed(1)}%`}</dd></div>
             </dl>
           </section>

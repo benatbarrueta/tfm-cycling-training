@@ -10,7 +10,7 @@ from app.database.models import ActivityRecord, PlannedWeek, PlannedWorkout, Sea
 def list_for_user(
     db: Session, user_id: UUID, start: datetime | None, end: datetime | None, limit: int, offset: int
 ) -> tuple[list[ActivityRecord], int]:
-    conditions = [ActivityRecord.user_id == user_id]
+    conditions = [ActivityRecord.user_id == user_id, ActivityRecord.external_status == "ACTIVE"]
     if start is not None:
         conditions.append(ActivityRecord.started_at >= start)
     if end is not None:
@@ -21,7 +21,13 @@ def list_for_user(
 
 
 def get_by_id_for_user(db: Session, activity_id: UUID, user_id: UUID) -> ActivityRecord | None:
-    return db.scalar(select(ActivityRecord).where(ActivityRecord.id == activity_id, ActivityRecord.user_id == user_id))
+    return db.scalar(
+        select(ActivityRecord).where(
+            ActivityRecord.id == activity_id,
+            ActivityRecord.user_id == user_id,
+            ActivityRecord.external_status == "ACTIVE",
+        )
+    )
 
 
 def get_workout_for_user(
@@ -49,7 +55,11 @@ def list_workouts_for_user_on_date(
         select(PlannedWorkout, ActivityRecord.id)
         .join(PlannedWeek)
         .join(SeasonPlan)
-        .outerjoin(ActivityRecord, ActivityRecord.planned_workout_id == PlannedWorkout.id)
+        .outerjoin(
+            ActivityRecord,
+            (ActivityRecord.planned_workout_id == PlannedWorkout.id)
+            & (ActivityRecord.external_status == "ACTIVE"),
+        )
         .where(
             SeasonPlan.user_id == user_id,
             PlannedWorkout.scheduled_date == scheduled_date,
@@ -66,6 +76,7 @@ def get_activity_linked_to_workout(
 ) -> ActivityRecord | None:
     query = select(ActivityRecord).where(
         ActivityRecord.planned_workout_id == planned_workout_id,
+        ActivityRecord.external_status == "ACTIVE",
     )
     if excluding_activity_id is not None:
         query = query.where(ActivityRecord.id != excluding_activity_id)
