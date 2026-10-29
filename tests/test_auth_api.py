@@ -5,8 +5,9 @@ os.environ["SESSION_SECRET"] = "test-secret"
 os.environ["DATABASE_URL"] = "sqlite:///./test-auth-import.db"
 
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.pool import StaticPool
@@ -20,7 +21,13 @@ from app.database.models import ActivityRecord, CyclistProfile, ExternalConnecti
 from app.database.session import get_db
 from app.main import app
 from app.api.routes import auth, integrations
-from app.integrations.strava import StravaAuthorization, StravaRateLimitError, StravaTokens
+from app.integrations.strava import (
+    StravaAuthenticationError,
+    StravaAuthorization,
+    StravaRateLimitError,
+    StravaTokens,
+    StravaUnavailableError,
+)
 
 
 engine = create_engine(
@@ -665,6 +672,168 @@ def test_strava_sync_can_be_paused_and_resumed(monkeypatch):
     resumed = client.put("/api/integrations/strava/sync-enabled", json={"enabled": True})
     assert resumed.status_code == 200
     assert resumed.json()["sync_enabled"] is True
+
+
+def configure_strava_sync_for_error_test() -> UUID:
+    with TestingSession() as db:
+        user_id = db.scalar(select(User.id).where(User.email == "rider@example.com"))
+        assert user_id is not None
+        db.add(
+            CyclistProfile(
+                user_id=user_id,
+                ftp=250,
+                weekly_hours=8,
+                available_days=["TUESDAY", "THURSDAY", "SUNDAY"],
+                modality="XCO",
+                level="INTERMEDIATE",
+                objective="PERFORMANCE",
+                timezone="Europe/Madrid",
+                onboarding_completed_at=datetime(2026, 10, 1),
+            )
+        )
+        connection = db.scalar(select(ExternalConnection))
+        assert connection is not None
+        connection.sync_enabled = True
+        connection.sync_start_date = datetime(2026, 1, 1).date()
+        connection.sync_status = "COMPLETED"
+        activity = ActivityRecord(
+            user_id=user_id,
+            title="Actividad conservada",
+            started_at=datetime(2026, 5, 1, 10),
+            sport="CYCLING",
+            duration_minutes=60,
+            source="EXTERNAL",
+            external_source_id="protected-activity",
+        )
+        db.add(activity)
+        db.commit()
+        return activity.id
+
+
+def assert_failed_sync_preserved_activity(activity_id: UUID) -> None:
+    with TestingSession() as db:
+        activity = db.get(ActivityRecord, activity_id)
+        connection = db.scalar(select(ExternalConnection))
+        assert activity is not None and connection is not None
+        assert activity.title == "Actividad conservada"
+        assert activity.external_status == "ACTIVE"
+        assert connection.sync_status == "FAILED"
+        assert connection.last_sync_at is None
+
+
+def test_strava_full_sync_refreshes_expired_token(monkeypatch):
+    connect_test_strava(monkeypatch, expires_at=1)
+    configure_strava_sync_for_error_test()
+    refreshed = StravaTokens(
+        access_token="fresh-sync-token",
+        refresh_token="fresh-refresh-token",
+        expires_at=2_100_000_000,
+    )
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "refresh_access_token",
+        lambda self, refresh_token: refreshed,
+    )
+    observed: dict[str, str] = {}
+
+    def list_activities(self, access_token, **kwargs):
+        observed["access_token"] = access_token
+        return [{"id": "protected-activity", "sport_type": "Ride"}]
+
+    monkeypatch.setattr(integrations.StravaClient, "list_athlete_activities", list_activities)
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "get_activity",
+        lambda self, access_token, activity_id: {
+            "id": activity_id,
+            "name": "Actividad conservada",
+            "sport_type": "Ride",
+            "start_date": "2026-05-01T10:00:00Z",
+            "moving_time": 3600,
+            "device_watts": False,
+        },
+    )
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "get_activity_streams",
+        lambda self, access_token, activity_id: {"time": list(range(61))},
+    )
+
+    response = client.post("/api/integrations/strava/sync/full")
+    assert response.status_code == 200
+    assert observed["access_token"] == "fresh-sync-token"
+    with TestingSession() as db:
+        connection = db.scalar(select(ExternalConnection))
+        assert connection is not None
+        assert connection.status == "CONNECTED"
+        assert "fresh-sync-token" not in connection.access_token_encrypted
+
+
+def test_strava_sync_requires_reauthorization_when_refresh_is_rejected(monkeypatch):
+    connect_test_strava(monkeypatch, expires_at=1)
+    activity_id = configure_strava_sync_for_error_test()
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "refresh_access_token",
+        lambda self, refresh_token: (_ for _ in ()).throw(StravaAuthenticationError()),
+    )
+
+    response = client.post("/api/integrations/strava/sync/full")
+    assert response.status_code == 401
+    assert "Vuelve a conectar" in response.json()["detail"]
+    assert_failed_sync_preserved_activity(activity_id)
+    with TestingSession() as db:
+        connection = db.scalar(select(ExternalConnection))
+        assert connection is not None
+        assert connection.status == "REAUTHORIZATION_REQUIRED"
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_status"),
+    [
+        (StravaRateLimitError(), 429),
+        (StravaUnavailableError(), 503),
+    ],
+)
+def test_strava_sync_external_failure_does_not_change_local_activities(
+    monkeypatch,
+    error,
+    expected_status,
+):
+    connect_test_strava(monkeypatch)
+    activity_id = configure_strava_sync_for_error_test()
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "list_athlete_activities",
+        lambda self, access_token, **kwargs: (_ for _ in ()).throw(error),
+    )
+
+    response = client.post("/api/integrations/strava/sync/full")
+    assert response.status_code == expected_status
+    assert_failed_sync_preserved_activity(activity_id)
+
+
+def test_strava_sync_rolls_back_reconciliation_when_activity_detail_fails(monkeypatch):
+    connect_test_strava(monkeypatch)
+    activity_id = configure_strava_sync_for_error_test()
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "list_athlete_activities",
+        lambda self, access_token, **kwargs: [{"id": "new-activity", "sport_type": "Ride"}],
+    )
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "get_activity",
+        lambda self, access_token, external_id: (_ for _ in ()).throw(StravaUnavailableError()),
+    )
+
+    response = client.post("/api/integrations/strava/sync/full")
+    assert response.status_code == 503
+    assert_failed_sync_preserved_activity(activity_id)
+    with TestingSession() as db:
+        assert db.scalar(
+            select(ActivityRecord).where(ActivityRecord.external_source_id == "new-activity")
+        ) is None
 
 
 def test_demo_cookie_is_http_only_and_session_stores_only_hash():

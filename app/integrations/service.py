@@ -17,7 +17,13 @@ from app.integrations.repository import (
     update_strava_tokens,
 )
 from app.integrations.schemas import StravaActivityCandidate, StravaActivityList, StravaSyncResult
-from app.integrations.strava import StravaAuthenticationError, StravaClient
+from app.integrations.strava import (
+    StravaAuthenticationError,
+    StravaClient,
+    StravaError,
+    StravaRateLimitError,
+    StravaUnavailableError,
+)
 
 
 CYCLING_TYPES = {
@@ -341,12 +347,12 @@ def _reconcile_strava_activities(
 
     after = int(range_start.timestamp())
     before = int((datetime.now(timezone.utc) + timedelta(days=1)).timestamp())
-    access_token = valid_access_token(db, connection, client, cipher)
     raw_items: list[dict] = []
     new = updated = deleted = unchanged = failed = 0
     last_error: str | None = None
     latest_started_at = connection.sync_cursor_at
     try:
+        access_token = valid_access_token(db, connection, client, cipher)
         page = 1
         while True:
             batch = client.list_athlete_activities(
@@ -451,6 +457,8 @@ def _reconcile_strava_activities(
         connection.sync_status = "FAILED"
         connection.sync_last_error = str(exc)[:1000]
         connection.last_sync_failed = max(failed, 1)
+        if isinstance(exc, StravaAuthenticationError):
+            connection.status = "REAUTHORIZATION_REQUIRED"
         db.commit()
         raise
 
