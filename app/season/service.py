@@ -200,6 +200,10 @@ def mark_overdue_week_pending_review(
         if week.status == "ACTIVE" and week.week_end < today:
             week.status = "PENDING_REVIEW"
             changed = True
+        elif week.status == "PENDING_REVIEW" and week.week_end >= today:
+            # Repairs stale state left by a future development reference date.
+            week.status = "ACTIVE"
+            changed = True
     if changed:
         db.commit()
         return get_plan(db, user_id, plan.id)

@@ -59,6 +59,21 @@ def current_plan(
 ) -> SeasonPlanRead:
     if reference_date is not None and settings.app_env != "development":
         raise HTTPException(status_code=404, detail="Recurso no encontrado.")
+    if reference_date is not None:
+        plan = get_plan(db, user.id)
+        if plan is None:
+            raise HTTPException(status_code=404, detail="No hay un plan activo.")
+        response = SeasonPlanRead.model_validate(plan)
+        return response.model_copy(
+            update={
+                "weeks": [
+                    week.model_copy(update={"status": "PENDING_REVIEW"})
+                    if week.status == "ACTIVE" and week.week_end < reference_date
+                    else week
+                    for week in response.weeks
+                ]
+            }
+        )
     plan = mark_overdue_week_pending_review(db, user.id, reference=reference_date)
     if plan is None:
         raise HTTPException(status_code=404, detail="No hay un plan activo.")

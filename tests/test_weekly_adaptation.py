@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from app.activities.service import available_workouts, link_to_workout
+from app.api.routes.season_plans import current_plan
 from app.core.config import Settings
 from app.database.base import Base
 from app.database.models import (
@@ -148,6 +149,18 @@ def test_elapsed_active_week_becomes_pending_review_idempotently():
         db.add_all([plan, phase, week])
         db.commit()
 
+        simulated = current_plan(
+            reference_date=date(2026, 10, 12),
+            user=user,
+            db=db,
+            settings=Settings(app_env="development"),
+        )
+        assert simulated.weeks[0].status == "PENDING_REVIEW"
+        db.expire_all()
+        persisted_week = db.scalar(select(PlannedWeek).where(PlannedWeek.id == week.id))
+        assert persisted_week is not None
+        assert persisted_week.status == "ACTIVE"
+
         detected = mark_overdue_week_pending_review(
             db, user.id, reference=date(2026, 10, 12)
         )
@@ -159,6 +172,12 @@ def test_elapsed_active_week_becomes_pending_review_idempotently():
         assert repeated is not None
         assert detected.weeks[0].status == "PENDING_REVIEW"
         assert repeated.weeks[0].status == "PENDING_REVIEW"
+
+        restored = mark_overdue_week_pending_review(
+            db, user.id, reference=date(2026, 10, 11)
+        )
+        assert restored is not None
+        assert restored.weeks[0].status == "ACTIVE"
 
 
 def test_rpe_fallback_reduces_load_after_a_hard_week():
