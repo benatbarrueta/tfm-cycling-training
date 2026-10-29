@@ -16,6 +16,11 @@ El proyecto combina:
 
 ## Entorno y pruebas
 
+El entorno validado utiliza Python 3.14 y Node.js 24. `requirements.txt`
+declara las dependencias Python directas y `requirements.lock` fija también
+las transitivas. Las dependencias del frontend quedan fijadas en
+`frontend/package-lock.json`.
+
 Crear y activar el entorno virtual:
 
 ```bash
@@ -26,7 +31,7 @@ source .venv/bin/activate
 Instalar las dependencias:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 ```
 
 Ejecutar todos los tests:
@@ -34,6 +39,11 @@ Ejecutar todos los tests:
 ```bash
 python -m pytest
 ```
+
+El workflow `.github/workflows/ci.yml` ejecuta estas pruebas en cada `push` y
+`pull_request`. También aplica todas las migraciones sobre una base vacía y,
+para el frontend, instala con `npm ci`, ejecuta el linter y genera el build de
+producción.
 
 ## Demostración con datos sintéticos
 
@@ -145,6 +155,14 @@ nuevas automáticamente. Las consultas incrementales tienen un intervalo mínimo
 de cinco minutos y reutilizan siete días de solapamiento para detectar cargas
 atrasadas sin crear duplicados.
 
+La tarjeta de Strava del perfil permite ejecutar una revisión completa,
+pausar o reanudar la sincronización y consultar el resultado de la última
+ejecución. La revisión completa vuelve a consultar el historial desde la fecha
+configurada; incorpora actividades nuevas, actualiza las modificadas y oculta
+las eliminadas en Strava. El RPE y las notas introducidas en Veloform se
+conservan. Si caduca la autorización, la interfaz solicita reconectar la cuenta;
+los límites o caídas temporales de Strava no alteran las actividades guardadas.
+
 Para probar la conexión, crea una aplicación en
 `https://www.strava.com/settings/api`, usa `localhost` como dominio de callback
 y añade al `.env` del backend:
@@ -212,10 +230,11 @@ archivo FIT o TCX de hasta 20 MB, revisar y corregir los datos extraídos y
 vincular la actividad a una sesión planificada del mismo día. El archivo no
 se conserva: se guarda la actividad con `source=FILE_IMPORT` y una huella
 SHA-256 que impide importar dos veces el mismo archivo para un usuario. Las
-importaciones directas desde GoldenCheetah quedan pendientes. La conexión con
-Strava ya puede autorizarse, aunque la selección e importación de sus
-actividades se realizará en la siguiente fase. El plan de temporada, los workouts planificados, el dashboard,
-el calendario y la vista Evolución consumen la API persistida.
+importaciones directas desde GoldenCheetah quedan pendientes. Strava puede
+autorizarse desde el perfil y sincroniza automáticamente las actividades de
+ciclismo desde la fecha elegida, sin selección individual. El plan de
+temporada, los workouts planificados, el dashboard, el calendario y la vista
+Evolución consumen la API persistida.
 
 Cuando una actividad no contiene TSS, el usuario puede indicar un esfuerzo
 percibido entre 1 y 10. Veloform calcula `duración × RPE` y lo conserva como
@@ -1110,6 +1129,11 @@ Están implementados:
 - Detección automática de semanas vencidas y estado `PENDING_REVIEW`.
 - Aviso global de revisión pendiente sin cerrar la semana automáticamente.
 - Importación revisable de actividades FIT y TCX con control de duplicados.
+- Conexión OAuth con Strava y almacenamiento cifrado de tokens.
+- Importación inicial de Strava desde una fecha elegida por el usuario.
+- Sincronización incremental al abrir el calendario y revisión completa manual.
+- Reconciliación de actividades nuevas, modificadas y eliminadas en Strava.
+- Pausa, reanudación, renovación de token y recuperación segura ante fallos de Strava.
 - Adaptación alternativa por cumplimiento, duración y RPE sin mezclar escalas.
 - Historial permanente de adaptaciones y temporadas finalizadas.
 - Detalle de cada semana con comparación provisional frente a adaptada.
@@ -1122,7 +1146,7 @@ Los siguientes desarrollos previstos son:
 
 1. Añadir un proceso programado y notificaciones externas para avisar sin que
    el usuario tenga que abrir la aplicación.
-2. Conectar la importación con GoldenCheetah o servicios externos.
+2. Conectar la importación directa con GoldenCheetah u otras fuentes externas.
 3. Ampliar el número y variedad de atletas.
 4. Evaluar la calibración temporal en ciclistas conocidos.
 5. Analizar por separado sesiones continuas e interválicas.
