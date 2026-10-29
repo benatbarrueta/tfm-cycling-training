@@ -19,11 +19,13 @@ from app.integrations.schemas import (
     IntegrationList,
     StravaActivityList,
     StravaSyncRequest,
+    StravaSyncEnabledRequest,
     StravaSyncResult,
 )
 from app.integrations.service import (
     list_strava_activities,
     sync_incremental_strava_activities,
+    sync_full_strava_activities,
     sync_strava_activities,
 )
 from app.integrations.strava import (
@@ -67,6 +69,7 @@ def list_integrations(
                 external_display_name=connection.external_display_name if connection else None,
                 connected_at=connection.connected_at if connection else None,
                 last_sync_at=connection.last_sync_at if connection else None,
+                last_sync_attempt_at=connection.last_sync_attempt_at if connection else None,
                 sync_start_date=connection.sync_start_date if connection else None,
                 sync_enabled=connection.sync_enabled if connection else False,
                 sync_status=connection.sync_status if connection else "NOT_CONFIGURED",
@@ -75,6 +78,11 @@ def list_integrations(
                 sync_skipped=connection.sync_skipped if connection else 0,
                 sync_failed=connection.sync_failed if connection else 0,
                 sync_last_error=connection.sync_last_error if connection else None,
+                last_sync_new=connection.last_sync_new if connection else 0,
+                last_sync_updated=connection.last_sync_updated if connection else 0,
+                last_sync_deleted=connection.last_sync_deleted if connection else 0,
+                last_sync_unchanged=connection.last_sync_unchanged if connection else 0,
+                last_sync_failed=connection.last_sync_failed if connection else 0,
             )
         ]
     )
@@ -272,3 +280,50 @@ def sync_strava_incrementally(
         raise HTTPException(status_code=503, detail="Strava no está disponible en este momento. Inténtalo de nuevo más tarde.") from exc
     except (StravaError, ValueError) as exc:
         raise HTTPException(status_code=502, detail="No se ha podido actualizar el calendario desde Strava.") from exc
+
+
+@router.post("/strava/sync/full", response_model=StravaSyncResult)
+def sync_strava_fully(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> StravaSyncResult:
+    connection = get_connection(db, user.id, "STRAVA")
+    profile = get_profile(db, user.id)
+    if connection is None or connection.status != "CONNECTED":
+        raise HTTPException(status_code=409, detail="Conecta de nuevo tu cuenta de Strava para sincronizar actividades.")
+    if profile is None or connection.sync_start_date is None:
+        raise HTTPException(status_code=409, detail="Configura primero desde qué fecha quieres sincronizar Strava.")
+    if connection.sync_status in {"PENDING", "RUNNING"}:
+        raise HTTPException(status_code=409, detail="Ya hay una sincronización de Strava en curso.")
+    try:
+        return sync_full_strava_activities(
+            db, user.id, connection, _strava(settings), _cipher(settings),
+            timezone_name=profile.timezone, ftp=profile.ftp,
+        )
+    except StravaAuthenticationError as exc:
+        raise HTTPException(status_code=401, detail="La autorización de Strava ha caducado. Vuelve a conectar tu cuenta.") from exc
+    except StravaRateLimitError as exc:
+        raise HTTPException(status_code=429, detail="Strava ha alcanzado temporalmente su límite de consultas. Inténtalo más tarde.") from exc
+    except StravaUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="Strava no está disponible en este momento. Inténtalo de nuevo más tarde.") from exc
+    except (StravaError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="No se ha podido completar la revisión de Strava.") from exc
+
+
+@router.put("/strava/sync-enabled", response_model=ExternalConnectionRead)
+def set_strava_sync_enabled(
+    payload: StravaSyncEnabledRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> ExternalConnectionRead:
+    connection = get_connection(db, user.id, "STRAVA")
+    if connection is None or connection.status != "CONNECTED":
+        raise HTTPException(status_code=409, detail="Conecta de nuevo tu cuenta de Strava.")
+    if payload.enabled and connection.sync_start_date is None:
+        raise HTTPException(status_code=409, detail="Configura primero desde qué fecha quieres sincronizar Strava.")
+    connection.sync_enabled = payload.enabled
+    db.commit()
+    db.refresh(connection)
+    return next(item for item in list_integrations(db, user, settings).items if item.provider == "STRAVA")

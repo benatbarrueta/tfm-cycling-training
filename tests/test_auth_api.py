@@ -550,6 +550,123 @@ def test_strava_incremental_sync_is_noop_before_initial_configuration():
     assert response.json()["imported"] == 0
 
 
+def test_strava_full_sync_updates_and_deletes_old_activities(monkeypatch):
+    connect_test_strava(monkeypatch)
+    with TestingSession() as db:
+        user_id = db.scalar(select(User.id).where(User.email == "rider@example.com"))
+        assert user_id is not None
+        db.add(
+            CyclistProfile(
+                user_id=user_id,
+                ftp=250,
+                weekly_hours=8,
+                available_days=["TUESDAY", "THURSDAY", "SUNDAY"],
+                modality="XCO",
+                level="INTERMEDIATE",
+                objective="PERFORMANCE",
+                timezone="Europe/Madrid",
+                onboarding_completed_at=datetime(2026, 10, 1),
+            )
+        )
+        connection = db.scalar(select(ExternalConnection))
+        assert connection is not None
+        connection.sync_enabled = False
+        connection.sync_start_date = datetime(2026, 1, 1).date()
+        connection.sync_status = "COMPLETED"
+        db.add_all(
+            [
+                ActivityRecord(
+                    user_id=user_id,
+                    title="Nombre antiguo",
+                    started_at=datetime(2026, 2, 1, 10),
+                    sport="CYCLING",
+                    duration_minutes=30,
+                    source="EXTERNAL",
+                    external_source_id="1001",
+                    perceived_exertion=7,
+                    notes="Nota del usuario",
+                ),
+                ActivityRecord(
+                    user_id=user_id,
+                    title="Eliminada en Strava",
+                    started_at=datetime(2026, 2, 2, 10),
+                    sport="CYCLING",
+                    duration_minutes=45,
+                    source="EXTERNAL",
+                    external_source_id="1002",
+                ),
+            ]
+        )
+        db.commit()
+
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "list_athlete_activities",
+        lambda self, access_token, **kwargs: [{"id": 1001, "sport_type": "Ride"}],
+    )
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "get_activity",
+        lambda self, access_token, activity_id: {
+            "id": 1001,
+            "name": "Nombre actualizado",
+            "sport_type": "Ride",
+            "start_date": "2026-02-01T10:00:00Z",
+            "moving_time": 3600,
+            "distance": 30000,
+            "device_watts": False,
+            "average_heartrate": 150,
+        },
+    )
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "get_activity_streams",
+        lambda self, access_token, activity_id: {"time": list(range(61)), "heartrate": [150] * 61},
+    )
+
+    response = client.post("/api/integrations/strava/sync/full")
+    assert response.status_code == 200
+    assert response.json()["updated"] == 1
+    assert response.json()["deleted"] == 1
+    with TestingSession() as db:
+        updated = db.scalar(select(ActivityRecord).where(ActivityRecord.external_source_id == "1001"))
+        deleted = db.scalar(select(ActivityRecord).where(ActivityRecord.external_source_id == "1002"))
+        connection = db.scalar(select(ExternalConnection))
+        assert updated is not None and deleted is not None and connection is not None
+        assert updated.title == "Nombre actualizado"
+        assert updated.perceived_exertion == 7
+        assert updated.notes == "Nota del usuario"
+        assert deleted.external_status == "DELETED_AT_SOURCE"
+        assert connection.last_sync_updated == 1
+        assert connection.last_sync_deleted == 1
+
+    repeated = client.post("/api/integrations/strava/sync/full")
+    assert repeated.status_code == 200
+    assert repeated.json()["unchanged"] == 1
+    assert repeated.json()["updated"] == 0
+    assert repeated.json()["deleted"] == 0
+
+
+def test_strava_sync_can_be_paused_and_resumed(monkeypatch):
+    connect_test_strava(monkeypatch)
+    with TestingSession() as db:
+        connection = db.scalar(select(ExternalConnection))
+        assert connection is not None
+        connection.sync_start_date = datetime(2026, 1, 1).date()
+        connection.sync_enabled = True
+        db.commit()
+
+    paused = client.put("/api/integrations/strava/sync-enabled", json={"enabled": False})
+    assert paused.status_code == 200
+    assert paused.json()["sync_enabled"] is False
+    automatic = client.post("/api/integrations/strava/sync/incremental")
+    assert automatic.status_code == 200
+    assert automatic.json()["status"] == "NOT_CONFIGURED"
+    resumed = client.put("/api/integrations/strava/sync-enabled", json={"enabled": True})
+    assert resumed.status_code == 200
+    assert resumed.json()["sync_enabled"] is True
+
+
 def test_demo_cookie_is_http_only_and_session_stores_only_hash():
     response = client.post("/api/auth/demo")
     assert response.cookies.get("veloform_session")

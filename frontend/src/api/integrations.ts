@@ -8,6 +8,7 @@ export interface ExternalConnection {
   external_display_name: string | null;
   connected_at: string | null;
   last_sync_at: string | null;
+  last_sync_attempt_at: string | null;
   sync_start_date: string | null;
   sync_enabled: boolean;
   sync_status: string;
@@ -16,6 +17,11 @@ export interface ExternalConnection {
   sync_skipped: number;
   sync_failed: number;
   sync_last_error: string | null;
+  last_sync_new: number;
+  last_sync_updated: number;
+  last_sync_deleted: number;
+  last_sync_unchanged: number;
+  last_sync_failed: number;
 }
 
 export function getIntegrations() {
@@ -76,13 +82,19 @@ export function getStravaActivities({
 }
 
 export interface StravaSyncResult {
-  status: "COMPLETED" | "COMPLETED_WITH_ERRORS" | "FAILED";
+  status: "COMPLETED" | "COMPLETED_WITH_ERRORS" | "FAILED" | "NOT_CONFIGURED" | "SKIPPED_RECENT" | "SKIPPED_RUNNING";
   total: number;
   imported: number;
   skipped: number;
   failed: number;
   start_date: string;
   last_error: string | null;
+  new: number;
+  updated: number;
+  deleted: number;
+  unchanged: number;
+  started_at: string | null;
+  finished_at: string | null;
 }
 
 export function startStravaSync(startDate: string) {
@@ -95,5 +107,18 @@ export function startStravaSync(startDate: string) {
 export function syncStravaIncrementally() {
   return apiRequest<StravaSyncResult>("/api/integrations/strava/sync/incremental", {
     method: "POST",
+  });
+}
+
+export function syncStravaFully() {
+  return apiRequest<StravaSyncResult>("/api/integrations/strava/sync/full", {
+    method: "POST",
+  });
+}
+
+export function setStravaSyncEnabled(enabled: boolean) {
+  return apiRequest<ExternalConnection>("/api/integrations/strava/sync-enabled", {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
   });
 }

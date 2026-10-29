@@ -11,6 +11,7 @@ class ExternalConnectionRead(BaseModel):
     external_display_name: str | None = None
     connected_at: datetime | None = None
     last_sync_at: datetime | None = None
+    last_sync_attempt_at: datetime | None = None
     sync_start_date: date | None = None
     sync_enabled: bool = False
     sync_status: str = "NOT_CONFIGURED"
@@ -19,6 +20,11 @@ class ExternalConnectionRead(BaseModel):
     sync_skipped: int = 0
     sync_failed: int = 0
     sync_last_error: str | None = None
+    last_sync_new: int = 0
+    last_sync_updated: int = 0
+    last_sync_deleted: int = 0
+    last_sync_unchanged: int = 0
+    last_sync_failed: int = 0
 
 
 class IntegrationList(BaseModel):
@@ -56,6 +62,10 @@ class StravaSyncRequest(BaseModel):
     start_date: date
 
 
+class StravaSyncEnabledRequest(BaseModel):
+    enabled: bool
+
+
 class StravaSyncResult(BaseModel):
     status: str
     total: int
@@ -64,3 +74,9 @@ class StravaSyncResult(BaseModel):
     failed: int
     start_date: date
     last_error: str | None = None
+    new: int = 0
+    updated: int = 0
+    deleted: int = 0
+    unchanged: int = 0
+    started_at: datetime | None = None
+    finished_at: datetime | None = None

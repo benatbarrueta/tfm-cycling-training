@@ -75,6 +75,7 @@ export function ProfilePage({ user, onSaved }: { user: AuthenticatedUser | null;
   const [saveError, setSaveError] = useState<string | null>(null);
   const [connectionBusy, setConnectionBusy] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const { profile, loading, error: profileError, save } = useCyclistProfile();
   const integrations = useIntegrations();
@@ -201,8 +202,8 @@ export function ProfilePage({ user, onSaved }: { user: AuthenticatedUser | null;
             <p>Conecta tus plataformas deportivas para incorporar actividades sin introducirlas manualmente.</p>
           </header>
 
-          {connectionMessage && (
-            <p className="profile-connections__notice" role="status">{connectionMessage}</p>
+          {(connectionMessage || syncNotice) && (
+            <p className="profile-connections__notice" role="status">{syncNotice ?? connectionMessage}</p>
           )}
           {(connectionError || integrations.error) && (
             <p className="profile-connections__error" role="alert">
@@ -234,20 +235,39 @@ export function ProfilePage({ user, onSaved }: { user: AuthenticatedUser | null;
                     )}
                   </p>
                   {integrations.strava.sync_enabled ? (
-                    <small>
-                      Sincronización configurada desde {integrations.strava.sync_start_date
-                        ? new Date(`${integrations.strava.sync_start_date}T00:00:00`).toLocaleDateString("es-ES")
-                        : "la fecha configurada"} · {integrations.strava.sync_imported} actividades importadas
-                      {integrations.strava.last_sync_at
-                        ? ` · Última sincronización ${new Date(integrations.strava.last_sync_at).toLocaleString("es-ES")}`
-                        : ""}
-                    </small>
+                    <div className="profile-connections__sync-status">
+                      <strong>Sincronización automática activa</strong>
+                      <small>
+                        Desde {integrations.strava.sync_start_date
+                          ? new Date(`${integrations.strava.sync_start_date}T00:00:00`).toLocaleDateString("es-ES")
+                          : "la fecha configurada"}
+                        {integrations.strava.last_sync_at
+                          ? ` · Último éxito ${new Date(integrations.strava.last_sync_at).toLocaleString("es-ES")}`
+                          : ""}
+                      </small>
+                      {integrations.strava.last_sync_attempt_at && (
+                        <small>
+                          Último resultado: {integrations.strava.last_sync_new} nuevas, {integrations.strava.last_sync_updated} actualizadas,
+                          {` ${integrations.strava.last_sync_deleted} eliminadas y ${integrations.strava.last_sync_unchanged} sin cambios`}
+                          {integrations.strava.last_sync_failed ? ` · ${integrations.strava.last_sync_failed} con error` : ""}.
+                        </small>
+                      )}
+                    </div>
                   ) : (
-                    <small>Configura en Actividades desde qué fecha quieres sincronizar tu historial.</small>
+                    <small>
+                      {integrations.strava.sync_start_date
+                        ? "La sincronización automática está pausada."
+                        : "Configura en Actividades desde qué fecha quieres sincronizar tu historial."}
+                    </small>
+                  )}
+                  {integrations.strava.sync_last_error && (
+                    <small className="profile-connections__sync-error">{integrations.strava.sync_last_error}</small>
                   )}
                 </div>
               ) : user?.is_demo ? (
                 <p>Las conexiones externas no están disponibles en el modo demostración. Accede con tu cuenta para conectar Strava.</p>
+              ) : integrations.strava?.status === "REAUTHORIZATION_REQUIRED" ? (
+                <p>Strava necesita que vuelvas a autorizar la conexión antes de seguir sincronizando.</p>
               ) : !integrations.strava?.configured ? (
                 <p>La integración está preparada, pero faltan las credenciales de Strava en la configuración del servidor.</p>
               ) : (
@@ -262,25 +282,69 @@ export function ProfilePage({ user, onSaved }: { user: AuthenticatedUser | null;
             </div>
             <div className="profile-connections__actions">
               {integrations.strava?.connected ? (
-                <button
-                  className="profile-connections__disconnect"
-                  type="button"
-                  disabled={connectionBusy}
-                  onClick={async () => {
-                    if (!window.confirm("¿Desconectar Strava de Veloform? No se eliminarán las actividades que ya hayas importado.")) return;
-                    setConnectionBusy(true);
-                    setConnectionError(null);
-                    try {
-                      await integrations.disconnect();
-                    } catch (cause) {
-                      setConnectionError(cause instanceof Error ? cause.message : "No se ha podido desconectar Strava.");
-                    } finally {
-                      setConnectionBusy(false);
-                    }
-                  }}
-                >
-                  {connectionBusy ? "Desconectando…" : "Desconectar"}
-                </button>
+                <>
+                  {integrations.strava.sync_start_date && (
+                    <button
+                      className="profile-connections__sync"
+                      type="button"
+                      disabled={connectionBusy}
+                      onClick={async () => {
+                        setConnectionBusy(true);
+                        setConnectionError(null);
+                        setSyncNotice(null);
+                        try {
+                          const result = await integrations.syncNow();
+                          setSyncNotice(`Revisión completada: ${result.new} nuevas, ${result.updated} actualizadas y ${result.deleted} eliminadas.`);
+                        } catch (cause) {
+                          setConnectionError(cause instanceof Error ? cause.message : "No se ha podido sincronizar Strava.");
+                        } finally {
+                          setConnectionBusy(false);
+                        }
+                      }}
+                    >
+                      Sincronizar ahora
+                    </button>
+                  )}
+                  {integrations.strava.sync_start_date && (
+                    <button
+                      className="profile-connections__pause"
+                      type="button"
+                      disabled={connectionBusy}
+                      onClick={async () => {
+                        setConnectionBusy(true);
+                        setConnectionError(null);
+                        try {
+                          await integrations.setSyncEnabled(!integrations.strava!.sync_enabled);
+                        } catch (cause) {
+                          setConnectionError(cause instanceof Error ? cause.message : "No se ha podido cambiar la sincronización.");
+                        } finally {
+                          setConnectionBusy(false);
+                        }
+                      }}
+                    >
+                      {integrations.strava.sync_enabled ? "Pausar" : "Reanudar"}
+                    </button>
+                  )}
+                  <button
+                    className="profile-connections__disconnect"
+                    type="button"
+                    disabled={connectionBusy}
+                    onClick={async () => {
+                      if (!window.confirm("¿Desconectar Strava de Veloform? No se eliminarán las actividades que ya hayas importado.")) return;
+                      setConnectionBusy(true);
+                      setConnectionError(null);
+                      try {
+                        await integrations.disconnect();
+                      } catch (cause) {
+                        setConnectionError(cause instanceof Error ? cause.message : "No se ha podido desconectar Strava.");
+                      } finally {
+                        setConnectionBusy(false);
+                      }
+                    }}
+                  >
+                    Desconectar
+                  </button>
+                </>
               ) : (
                 <button
                   className="profile-connections__connect"

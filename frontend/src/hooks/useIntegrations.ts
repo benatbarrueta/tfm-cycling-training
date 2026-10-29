@@ -3,6 +3,8 @@ import {
   beginStravaConnection,
   disconnectStrava,
   getIntegrations,
+  setStravaSyncEnabled,
+  syncStravaFully,
   type ExternalConnection,
 } from "../api/integrations";
 
@@ -55,5 +57,17 @@ export function useIntegrations() {
     await refresh();
   }, [refresh]);
 
-  return { strava, loading, error, connect, disconnect, refresh };
+  const syncNow = useCallback(async () => {
+    const result = await syncStravaFully();
+    await refresh();
+    return result;
+  }, [refresh]);
+
+  const setSyncEnabled = useCallback(async (enabled: boolean) => {
+    const connection = await setStravaSyncEnabled(enabled);
+    setStrava(connection);
+    return connection;
+  }, []);
+
+  return { strava, loading, error, connect, disconnect, refresh, syncNow, setSyncEnabled };
 }

@@ -158,6 +158,29 @@
   color: #758178;
 }
 
+.profile-connections__sync-status {
+  display: grid;
+  gap: 0.15rem;
+  margin-top: 0.45rem;
+}
+
+.profile-connections__sync-status > strong {
+  color: #21613f;
+  font-size: 0.85rem;
+}
+
+.profile-connections__sync-error {
+  color: #8a2f22 !important;
+}
+
+.profile-connections__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  max-width: 24rem;
+}
+
 .profile-connections__actions button {
   min-height: 2.7rem;
   padding: 0 1rem;
@@ -177,6 +200,18 @@
   color: #8a2f22;
   background: #ffffff;
   border: 1px solid #dfb7af;
+}
+
+.profile-connections__sync {
+  color: #ffffff;
+  background: #237b50;
+  border: 1px solid #237b50;
+}
+
+.profile-connections__pause {
+  color: #245f42;
+  background: #ffffff;
+  border: 1px solid #a9cfba;
 }
 
 .profile-connections__actions button:disabled {
