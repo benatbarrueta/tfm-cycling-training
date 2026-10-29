@@ -29,6 +29,9 @@ class User(Base):
     cyclist_profile: Mapped["CyclistProfile | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
+    external_connections: Mapped[list["ExternalConnection"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class UserSession(Base):
@@ -64,6 +67,30 @@ class CyclistProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     user: Mapped[User] = relationship(back_populates="cyclist_profile")
+
+
+class ExternalConnection(Base):
+    __tablename__ = "external_connections"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_external_connections_user_provider"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    external_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    external_display_name: Mapped[str | None] = mapped_column(String(255))
+    access_token_encrypted: Mapped[str] = mapped_column(String(2048), nullable=False)
+    refresh_token_encrypted: Mapped[str] = mapped_column(String(2048), nullable=False)
+    token_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    granted_scopes: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="CONNECTED")
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    user: Mapped[User] = relationship(back_populates="external_connections")
 
 
 class ActivityRecord(Base):

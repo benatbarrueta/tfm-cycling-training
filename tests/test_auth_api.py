@@ -16,10 +16,11 @@ from app.auth.google import GoogleIdentity
 from app.auth.sessions import hash_token, utc_now
 from app.core.config import Settings, get_settings
 from app.database.base import Base
-from app.database.models import ActivityRecord, CyclistProfile, UserSession
+from app.database.models import ActivityRecord, CyclistProfile, ExternalConnection, UserSession
 from app.database.session import get_db
 from app.main import app
-from app.api.routes import auth
+from app.api.routes import auth, integrations
+from app.integrations.strava import StravaAuthorization
 
 
 engine = create_engine(
@@ -45,6 +46,10 @@ def override_settings():
         database_url="sqlite://",
         session_secret="test-secret",
         google_client_id="client-id",
+        strava_client_id="strava-client",
+        strava_client_secret="strava-secret",
+        strava_redirect_uri="http://testserver/api/integrations/strava/callback",
+        external_token_encryption_key="encryption-secret",
     )
 
 
@@ -95,6 +100,68 @@ def test_demo_login_me_and_logout():
 
     assert client.post("/api/auth/logout").status_code == 204
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_strava_connection_requires_personal_account_and_persists_encrypted_tokens(monkeypatch):
+    client.post("/api/auth/demo")
+    assert client.post("/api/integrations/strava/connect").status_code == 403
+    client.cookies.clear()
+
+    client.post("/api/auth/google", json={"credential": "valid"})
+    start = client.post("/api/integrations/strava/connect")
+    assert start.status_code == 200
+    authorization_url = start.json()["authorization_url"]
+    assert "activity%3Aread_all" in authorization_url
+
+    from urllib.parse import parse_qs, urlparse
+
+    state_value = parse_qs(urlparse(authorization_url).query)["state"][0]
+
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "exchange_code",
+        lambda self, code, scopes=None: StravaAuthorization(
+            athlete_id="12345",
+            athlete_name="Test Rider",
+            access_token="plain-access-token",
+            refresh_token="plain-refresh-token",
+            expires_at=2_000_000_000,
+            scopes=["read", "activity:read_all"],
+        ),
+    )
+    callback = client.get(
+        "/api/integrations/strava/callback",
+        params={"state": state_value, "code": "authorization-code", "scope": "read,activity:read_all"},
+        follow_redirects=False,
+    )
+    assert callback.status_code == 303
+    assert "connection=strava-success" in callback.headers["location"]
+
+    listed = client.get("/api/integrations").json()["items"][0]
+    assert listed["connected"] is True
+    assert listed["external_display_name"] == "Test Rider"
+    with TestingSession() as db:
+        connection = db.scalar(select(ExternalConnection))
+        assert connection is not None
+        assert "plain-access-token" not in connection.access_token_encrypted
+        assert "plain-refresh-token" not in connection.refresh_token_encrypted
+
+    monkeypatch.setattr(integrations.StravaClient, "deauthorize", lambda self, access_token: None)
+    assert client.delete("/api/integrations/strava").status_code == 204
+    assert client.get("/api/integrations").json()["items"][0]["connected"] is False
+
+
+def test_strava_callback_rejects_tampered_state():
+    client.post("/api/auth/google", json={"credential": "valid"})
+    response = client.get(
+        "/api/integrations/strava/callback",
+        params={"state": "tampered.state", "code": "authorization-code"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert "connection=strava-invalid-state" in response.headers["location"]
+    with TestingSession() as db:
+        assert db.query(ExternalConnection).count() == 0
 
 
 def test_demo_cookie_is_http_only_and_session_stores_only_hash():

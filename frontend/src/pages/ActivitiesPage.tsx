@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   commitActivityImport,
   getActivity,
@@ -8,8 +8,10 @@ import {
   type ActivityImportPreview,
 } from "../api/activities";
 import { ActivityForm } from "../components/ActivityForm";
+import { IntegrationLogo } from "../components/IntegrationLogo";
 import { useActivities } from "../hooks/useActivities";
 import "../styles/ActivitiesPage.css";
+import { useIntegrations } from "../hooks/useIntegrations";
 
 function localDateTime(value: string) {
   const date = new Date(value);
@@ -33,6 +35,7 @@ export function ActivitiesPage() {
   const [importPreview, setImportPreview] = useState<ActivityImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
   const [draggingFile, setDraggingFile] = useState(false);
+  const integrations = useIntegrations();
 
   useEffect(() => {
     const editId = searchParams.get("edit");
@@ -126,6 +129,16 @@ export function ActivitiesPage() {
           </button>
         </div>
       </header>
+      {!integrations.loading && !integrations.strava?.connected && (
+        <aside className="activities-page__strava-prompt">
+          <IntegrationLogo provider="STRAVA" className="activities-page__integration-logo" />
+          <div>
+            <strong>¿Usas Strava?</strong>
+            <p>Conecta tu cuenta para encontrar tus actividades sin descargar archivos.</p>
+          </div>
+          <Link to="/profile#connections">Configurar en el perfil</Link>
+        </aside>
+      )}
       <section
         className={`activities-page__drop-zone${draggingFile ? " activities-page__drop-zone--active" : ""}${importing ? " activities-page__drop-zone--busy" : ""}`}
         aria-label="Importar una actividad FIT o TCX"

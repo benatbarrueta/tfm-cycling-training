@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import {
@@ -12,6 +13,9 @@ import {
 } from "../schemas/cyclistSchema";
 import "../styles/ProfilePage.css";
 import { useCyclistProfile } from "../hooks/useCyclistProfile";
+import { useIntegrations } from "../hooks/useIntegrations";
+import type { AuthenticatedUser } from "../api/types";
+import { IntegrationLogo } from "../components/IntegrationLogo";
 
 const modalityLabels = {
   ROAD: "Carretera",
@@ -60,10 +64,21 @@ function defaultProfile(): CyclistFormValues {
   return defaultProfile;
 }
 
-export function ProfilePage({ onSaved }: { onSaved?: () => void } = {}) {
+const connectionMessages: Record<string, string> = {
+  "strava-cancelled": "No se ha conectado Strava porque cancelaste la autorización.",
+  "strava-invalid-state": "La solicitud de conexión ha caducado. Vuelve a intentarlo.",
+  "strava-error": "No se ha podido completar la conexión con Strava. Vuelve a intentarlo.",
+};
+
+export function ProfilePage({ user, onSaved }: { user: AuthenticatedUser | null; onSaved?: () => void }) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [connectionBusy, setConnectionBusy] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const { profile, loading, error: profileError, save } = useCyclistProfile();
+  const integrations = useIntegrations();
+  const connectionMessage = connectionMessages[searchParams.get("connection") ?? ""];
 
   const {
     register,
@@ -178,6 +193,104 @@ export function ProfilePage({ onSaved }: { onSaved?: () => void } = {}) {
               )}
             </label>
           </div>
+        </section>
+
+        <section className="profile-form__section profile-connections" id="connections">
+          <header>
+            <h2>Aplicaciones conectadas</h2>
+            <p>Conecta tus plataformas deportivas para incorporar actividades sin introducirlas manualmente.</p>
+          </header>
+
+          {connectionMessage && (
+            <p className="profile-connections__notice" role="status">{connectionMessage}</p>
+          )}
+          {(connectionError || integrations.error) && (
+            <p className="profile-connections__error" role="alert">
+              {connectionError ?? integrations.error}
+            </p>
+          )}
+
+          <article className="profile-connections__card">
+            <IntegrationLogo provider="STRAVA" className="profile-connections__logo" />
+            <div className="profile-connections__content">
+              <div className="profile-connections__title">
+                <h3>Strava</h3>
+                {integrations.strava?.connected && <span>Conectado</span>}
+              </div>
+
+              {integrations.loading ? (
+                <p role="status">Comprobando conexión…</p>
+              ) : integrations.strava?.connected ? (
+                <div className="profile-connections__connected-summary">
+                  <p>
+                    <strong>{integrations.strava.external_display_name || "Atleta de Strava"}</strong>
+                    {integrations.strava.connected_at && (
+                      <>
+                        <span aria-hidden="true"> · </span>
+                        <time dateTime={integrations.strava.connected_at}>
+                        Conectada desde el {new Date(integrations.strava.connected_at).toLocaleDateString("es-ES")}
+                        </time>
+                      </>
+                    )}
+                  </p>
+                  <small>Ya puedes buscar y seleccionar las actividades que quieras importar.</small>
+                </div>
+              ) : user?.is_demo ? (
+                <p>Las conexiones externas no están disponibles en el modo demostración. Accede con tu cuenta para conectar Strava.</p>
+              ) : !integrations.strava?.configured ? (
+                <p>La integración está preparada, pero faltan las credenciales de Strava en la configuración del servidor.</p>
+              ) : (
+                <p>
+                  Sincroniza tus actividades de ciclismo para revisarlas e incorporarlas a Veloform.
+                  Nada se importará sin tu confirmación.
+                </p>
+              )}
+              {!integrations.strava?.connected && !user?.is_demo && integrations.strava?.configured && (
+                <small>Podrás seleccionar qué actividades importar después de conectar tu cuenta.</small>
+              )}
+            </div>
+            <div className="profile-connections__actions">
+              {integrations.strava?.connected ? (
+                <button
+                  className="profile-connections__disconnect"
+                  type="button"
+                  disabled={connectionBusy}
+                  onClick={async () => {
+                    if (!window.confirm("¿Desconectar Strava de Veloform? No se eliminarán las actividades que ya hayas importado.")) return;
+                    setConnectionBusy(true);
+                    setConnectionError(null);
+                    try {
+                      await integrations.disconnect();
+                    } catch (cause) {
+                      setConnectionError(cause instanceof Error ? cause.message : "No se ha podido desconectar Strava.");
+                    } finally {
+                      setConnectionBusy(false);
+                    }
+                  }}
+                >
+                  {connectionBusy ? "Desconectando…" : "Desconectar"}
+                </button>
+              ) : (
+                <button
+                  className="profile-connections__connect"
+                  type="button"
+                  disabled={connectionBusy || user?.is_demo || !integrations.strava?.configured}
+                  onClick={async () => {
+                    setConnectionBusy(true);
+                    setConnectionError(null);
+                    try {
+                      await integrations.connect();
+                    } catch (cause) {
+                      setConnectionError(cause instanceof Error ? cause.message : "No se ha podido iniciar la conexión con Strava.");
+                      setConnectionBusy(false);
+                    }
+                  }}
+                >
+                  {connectionBusy ? "Conectando…" : "Conectar"}
+                </button>
+              )}
+            </div>
+          </article>
         </section>
 
         <section className="profile-form__section">

@@ -136,6 +136,29 @@ se recupera con `GET /api/profile`. Antes de utilizar las rutas del dashboard,
 un usuario autenticado sin perfil es dirigido a `/onboarding`; la fecha de
 objetivo solo es obligatoria para el objetivo `RACE`.
 
+### Conexión con Strava
+
+El perfil incluye una sección de aplicaciones conectadas. En esta primera
+fase Veloform puede autorizar, mostrar y desconectar una cuenta de Strava; no
+importa actividades hasta que el usuario las seleccione en un paso posterior.
+
+Para probar la conexión, crea una aplicación en
+`https://www.strava.com/settings/api`, usa `localhost` como dominio de callback
+y añade al `.env` del backend:
+
+```dotenv
+STRAVA_CLIENT_ID=tu-client-id
+STRAVA_CLIENT_SECRET=tu-client-secret
+STRAVA_REDIRECT_URI=http://localhost:8000/api/integrations/strava/callback
+EXTERNAL_TOKEN_ENCRYPTION_KEY=un-secreto-largo-y-aleatorio
+```
+
+La URL de callback registrada en Strava debe coincidir con
+`STRAVA_REDIRECT_URI`. Los tokens se cifran antes de guardarse y nunca se
+devuelven al frontend. El modo demostración no admite conexiones externas.
+Si faltan las credenciales, el perfil muestra la integración como pendiente
+de configuración.
+
 ### Actividades realizadas
 
 Las actividades representan sesiones que el ciclista ha realizado y se
@@ -186,8 +209,9 @@ archivo FIT o TCX de hasta 20 MB, revisar y corregir los datos extraídos y
 vincular la actividad a una sesión planificada del mismo día. El archivo no
 se conserva: se guarda la actividad con `source=FILE_IMPORT` y una huella
 SHA-256 que impide importar dos veces el mismo archivo para un usuario. Las
-importaciones directas desde GoldenCheetah y servicios externos quedan
-pendientes. El plan de temporada, los workouts planificados, el dashboard,
+importaciones directas desde GoldenCheetah quedan pendientes. La conexión con
+Strava ya puede autorizarse, aunque la selección e importación de sus
+actividades se realizará en la siguiente fase. El plan de temporada, los workouts planificados, el dashboard,
 el calendario y la vista Evolución consumen la API persistida.
 
 Cuando una actividad no contiene TSS, el usuario puede indicar un esfuerzo

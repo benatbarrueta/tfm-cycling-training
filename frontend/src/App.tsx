@@ -94,8 +94,8 @@ function AppRoutes({ auth }: AppRoutesProps) {
             <Route path="/plans/:planId/weeks/:weekId" element={<WeekDetailPage />} />
             <Route path="/progress" element={<ProgressPage />} />
           </Route>
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/profile" element={<ProfilePage user={auth.user} />} />
+          <Route path="/onboarding" element={<OnboardingPage user={auth.user} />} />
         </Route>
         <Route path="*" element={<Navigate to={auth.isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>

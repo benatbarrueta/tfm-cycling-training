@@ -97,7 +97,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
             <span className="app-header__menu-user">{user?.email}</span>
             {user?.is_demo && <span className="app-header__menu-demo">Modo demostración</span>}
             <Link to="/profile" role="menuitem" onClick={() => setMenuOpen(false)}>
-              Perfil
+              Perfil y conexiones
             </Link>
             <button type="button" role="menuitem" onClick={() => void onSignOut()} disabled={signingOut}>
               {signingOut ? "Cerrando sesión…" : "Cerrar sesión"}
@@ -147,7 +147,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
             </nav>
             <div className="app-header__mobile-drawer-actions">
               <Link to="/profile" onClick={() => setMenuOpen(false)}>
-                Perfil
+                Perfil y conexiones
               </Link>
               <button type="button" onClick={() => void onSignOut()} disabled={signingOut}>
                 {signingOut ? "Cerrando sesión…" : "Cerrar sesión"}

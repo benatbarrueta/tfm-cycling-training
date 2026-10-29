@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:5173"
     session_cookie_name: str = "veloform_session"
     session_ttl_days: int = 30
+    strava_client_id: str = ""
+    strava_client_secret: str = Field(default="", repr=False)
+    strava_redirect_uri: str = "http://localhost:8000/api/integrations/strava/callback"
+    external_token_encryption_key: str = Field(default="", repr=False)
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -26,6 +30,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def strava_configured(self) -> bool:
+        return bool(self.strava_client_id and self.strava_client_secret and self.strava_redirect_uri)
 
 
 @lru_cache

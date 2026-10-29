@@ -10,3 +10,4 @@ requests
 httpx
 httpx2
 fitparse
+cryptography
