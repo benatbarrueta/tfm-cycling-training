@@ -9,6 +9,7 @@ import {
 } from "../api/activities";
 import { ActivityForm } from "../components/ActivityForm";
 import { IntegrationLogo } from "../components/IntegrationLogo";
+import { StravaActivityPicker } from "../components/StravaActivityPicker";
 import { useActivities } from "../hooks/useActivities";
 import "../styles/ActivitiesPage.css";
 import { useIntegrations } from "../hooks/useIntegrations";
@@ -35,6 +36,7 @@ export function ActivitiesPage() {
   const [importPreview, setImportPreview] = useState<ActivityImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
   const [draggingFile, setDraggingFile] = useState(false);
+  const [showStravaPicker, setShowStravaPicker] = useState(false);
   const integrations = useIntegrations();
 
   useEffect(() => {
@@ -139,6 +141,17 @@ export function ActivitiesPage() {
           <Link to="/profile#connections">Configurar en el perfil</Link>
         </aside>
       )}
+      {!integrations.loading && integrations.strava?.connected && (
+        <aside className="activities-page__strava-prompt activities-page__strava-prompt--connected">
+          <IntegrationLogo provider="STRAVA" className="activities-page__integration-logo" />
+          <div>
+            <strong>Strava conectado</strong>
+            <p>Elige desde qué fecha quieres recuperar tus salidas y configura la sincronización automática.</p>
+          </div>
+          <button type="button" onClick={() => setShowStravaPicker(true)}>Configurar sincronización</button>
+        </aside>
+      )}
+      {showStravaPicker && <StravaActivityPicker onClose={() => setShowStravaPicker(false)} />}
       <section
         className={`activities-page__drop-zone${draggingFile ? " activities-page__drop-zone--active" : ""}${importing ? " activities-page__drop-zone--busy" : ""}`}
         aria-label="Importar una actividad FIT o TCX"

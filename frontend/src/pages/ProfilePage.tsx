@@ -233,7 +233,18 @@ export function ProfilePage({ user, onSaved }: { user: AuthenticatedUser | null;
                       </>
                     )}
                   </p>
-                  <small>Ya puedes buscar y seleccionar las actividades que quieras importar.</small>
+                  {integrations.strava.sync_enabled ? (
+                    <small>
+                      Sincronización configurada desde {integrations.strava.sync_start_date
+                        ? new Date(`${integrations.strava.sync_start_date}T00:00:00`).toLocaleDateString("es-ES")
+                        : "la fecha configurada"} · {integrations.strava.sync_imported} actividades importadas
+                      {integrations.strava.last_sync_at
+                        ? ` · Última sincronización ${new Date(integrations.strava.last_sync_at).toLocaleString("es-ES")}`
+                        : ""}
+                    </small>
+                  ) : (
+                    <small>Configura en Actividades desde qué fecha quieres sincronizar tu historial.</small>
+                  )}
                 </div>
               ) : user?.is_demo ? (
                 <p>Las conexiones externas no están disponibles en el modo demostración. Accede con tu cuenta para conectar Strava.</p>
@@ -246,7 +257,7 @@ export function ProfilePage({ user, onSaved }: { user: AuthenticatedUser | null;
                 </p>
               )}
               {!integrations.strava?.connected && !user?.is_demo && integrations.strava?.configured && (
-                <small>Podrás seleccionar qué actividades importar después de conectar tu cuenta.</small>
+                <small>Después de conectar tu cuenta podrás elegir desde qué fecha sincronizar el historial.</small>
               )}
             </div>
             <div className="profile-connections__actions">

@@ -90,6 +90,505 @@
   font-weight: 800;
 }
 
+.activities-page__strava-prompt--connected {
+  background: #f0f7f2;
+  border-color: #bdd9c6;
+}
+
+.activities-page__strava-prompt > button {
+  min-height: 2.6rem;
+  padding: 0 1rem;
+  color: #ffffff;
+  background: #27734b;
+  border: 1px solid #27734b;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.strava-picker__overlay {
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  display: grid;
+  padding: clamp(0.75rem, 3vw, 2rem);
+  place-items: center;
+  background: rgba(14, 35, 24, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.strava-picker {
+  display: grid;
+  width: min(68rem, 100%);
+  max-height: calc(100vh - clamp(1.5rem, 6vw, 4rem));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  background: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 1.5rem 4rem rgba(12, 31, 21, 0.3);
+}
+
+.strava-picker__header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 1rem 1.25rem;
+  align-items: center;
+  gap: 0.85rem;
+  background: #fff7f1;
+  border-bottom: 1px solid #f0d2c2;
+}
+
+.strava-picker__header p,
+.strava-picker__header h2 {
+  margin: 0;
+}
+
+.strava-picker__header p {
+  color: #a8461c;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.strava-picker__header h2 {
+  margin-top: 0.15rem;
+  font-size: 1.35rem;
+}
+
+.strava-picker__logo {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+}
+
+.strava-picker__header > button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  place-items: center;
+  color: #17241c;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.8rem;
+}
+
+.strava-picker__header > button:hover,
+.strava-picker__header > button:focus-visible {
+  background: #f4dfd3;
+  outline: none;
+}
+
+.strava-picker__body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.strava-picker--setup {
+  width: min(48rem, 100%);
+}
+
+.strava-sync-setup {
+  display: grid;
+  gap: 1rem;
+}
+
+.strava-sync-setup__intro {
+  padding: 1rem;
+  color: #183c29;
+  background: #edf7f0;
+  border-radius: 0.75rem;
+}
+
+.strava-sync-setup__intro strong {
+  font-size: 1.05rem;
+}
+
+.strava-sync-setup__intro p,
+.strava-sync-setup__scope p,
+.strava-sync-setup__preview p {
+  margin: 0.3rem 0 0;
+  color: #5f7066;
+  line-height: 1.45;
+}
+
+.strava-sync-setup__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.strava-sync-setup__form label,
+.strava-sync-setup__form label > span {
+  display: block;
+}
+
+.strava-sync-setup__form label > span {
+  margin-bottom: 0.35rem;
+  color: #43554a;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.strava-sync-setup__form input,
+.strava-sync-setup__form button {
+  min-height: 2.8rem;
+  padding: 0 0.85rem;
+  border-radius: 0.6rem;
+  font: inherit;
+}
+
+.strava-sync-setup__form input {
+  width: 100%;
+  background: #f8faf8;
+  border: 1px solid #ccd9d0;
+}
+
+.strava-sync-setup__form button {
+  color: #ffffff;
+  background: #27734b;
+  border: 1px solid #27734b;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.strava-sync-setup__scope {
+  display: flex;
+  padding: 0.8rem 0.9rem;
+  align-items: flex-start;
+  gap: 0.7rem;
+  background: #f7f9f7;
+  border: 1px solid #e0e7e2;
+  border-radius: 0.7rem;
+}
+
+.strava-sync-setup__scope > span {
+  display: grid;
+  width: 1.55rem;
+  height: 1.55rem;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #ffffff;
+  background: #27734b;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.strava-sync-setup__preview {
+  padding: 1rem;
+  background: #fffaf2;
+  border: 1px solid #f0d9a9;
+  border-radius: 0.75rem;
+}
+
+.strava-sync-setup__result {
+  padding: 1rem;
+  color: #215f3f;
+  background: #e8f5ec;
+  border: 1px solid #b9ddc5;
+  border-radius: 0.75rem;
+}
+
+.strava-sync-setup__result > strong {
+  font-size: 1.05rem;
+}
+
+.strava-sync-setup__result > div {
+  display: flex;
+  margin-top: 0.75rem;
+  gap: 1rem;
+}
+
+.strava-sync-setup__result span,
+.strava-sync-setup__result p {
+  color: #4f6b5a;
+}
+
+.strava-sync-setup__result p {
+  margin: 0.65rem 0 0;
+}
+
+.strava-sync-setup__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.strava-sync-setup__summary > div {
+  padding: 0.75rem;
+  background: #ffffff;
+  border-radius: 0.55rem;
+}
+
+.strava-sync-setup__summary strong,
+.strava-sync-setup__summary span {
+  display: block;
+}
+
+.strava-sync-setup__summary strong {
+  color: #17241c;
+  font-size: 1.2rem;
+}
+
+.strava-sync-setup__summary span {
+  margin-top: 0.1rem;
+  color: #6b786f;
+  font-size: 0.75rem;
+}
+
+.strava-picker__filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.strava-picker__filters label,
+.strava-picker__filters span {
+  display: block;
+}
+
+.strava-picker__filters span {
+  margin-bottom: 0.35rem;
+  color: #43554a;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.strava-picker__filters input,
+.strava-picker__filters button {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 0.8rem;
+  border-radius: 0.6rem;
+  font: inherit;
+}
+
+.strava-picker__filters input {
+  background: #f8faf8;
+  border: 1px solid #ccd9d0;
+}
+
+.strava-picker__filters button {
+  color: #ffffff;
+  background: #27734b;
+  border: 1px solid #27734b;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.strava-picker__toolbar {
+  display: flex;
+  margin-top: 1rem;
+  padding: 0.75rem 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e2e9e4;
+}
+
+.strava-picker__toolbar > div:first-child strong,
+.strava-picker__toolbar > div:first-child span {
+  display: block;
+}
+
+.strava-picker__toolbar > div:first-child span {
+  margin-top: 0.15rem;
+  color: #718078;
+  font-size: 0.78rem;
+}
+
+.strava-picker__toolbar > div:last-child {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.strava-picker__toolbar button,
+.strava-picker__pagination button {
+  min-height: 2.25rem;
+  padding: 0 0.7rem;
+  color: #245c3d;
+  background: #ffffff;
+  border: 1px solid #bcd8c6;
+  border-radius: 0.55rem;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.strava-picker button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.strava-picker__prepared {
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.9rem;
+  color: #215f3f;
+  background: #e8f5ec;
+  border-radius: 0.6rem;
+}
+
+.strava-picker__state {
+  margin: 1rem 0 0;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  background: #f7f9f7;
+  border-radius: 0.75rem;
+}
+
+.strava-picker__state p {
+  margin: 0.35rem 0 0;
+  color: #65736b;
+}
+
+.strava-picker__state--error {
+  color: #8a2f22;
+  background: #fff0ed;
+}
+
+.strava-picker__state--error button {
+  margin-top: 0.75rem;
+}
+
+.strava-picker__list {
+  display: grid;
+  margin-top: 0.85rem;
+  gap: 0.65rem;
+}
+
+.strava-picker__activity {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 0.85rem;
+  gap: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #d9e3dc;
+  border-radius: 0.75rem;
+  cursor: pointer;
+}
+
+.strava-picker__activity--selected {
+  background: #edf7f0;
+  border-color: #57a473;
+  box-shadow: inset 3px 0 #27734b;
+}
+
+.strava-picker__activity--imported {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.strava-picker__activity > input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  accent-color: #27734b;
+}
+
+.strava-picker__activity-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.strava-picker__activity-main strong,
+.strava-picker__activity-main span {
+  display: block;
+}
+
+.strava-picker__activity-main span,
+.strava-picker__activity-main time {
+  color: #68776e;
+  font-size: 0.78rem;
+}
+
+.strava-picker__activity dl {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0.65rem 0 0;
+  gap: 0.5rem;
+}
+
+.strava-picker__activity dl > div {
+  padding: 0.45rem 0.55rem;
+  background: #f4f7f5;
+  border-radius: 0.45rem;
+}
+
+.strava-picker__activity dt {
+  color: #758178;
+  font-size: 0.68rem;
+}
+
+.strava-picker__activity dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.strava-picker__imported-label {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.85rem;
+  padding: 0.2rem 0.45rem;
+  color: #56655c;
+  background: #e3e8e5;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.strava-picker__pagination {
+  display: flex;
+  margin-top: 1rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.strava-picker__pagination span {
+  color: #66746c;
+  font-size: 0.8rem;
+}
+
+.strava-picker__footer {
+  display: flex;
+  padding: 0.9rem 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #f8faf8;
+  border-top: 1px solid #dfe7e2;
+}
+
+.strava-picker__footer button {
+  min-height: 2.7rem;
+  padding: 0 1rem;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.strava-picker__footer button:first-child {
+  color: #245c3d;
+  background: #ffffff;
+  border: 1px solid #bcd8c6;
+}
+
+.strava-picker__footer button:last-child {
+  color: #ffffff;
+  background: #27734b;
+  border: 1px solid #27734b;
+}
+
 .activities-page__drop-zone {
   display: flex;
   min-height: 6.5rem;
@@ -472,6 +971,39 @@
 
   .activities-page__strava-prompt a {
     grid-column: 1 / -1;
+  }
+
+  .activities-page__strava-prompt > button {
+    grid-column: 1 / -1;
+  }
+
+  .strava-picker__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .strava-sync-setup__form,
+  .strava-sync-setup__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .strava-picker__toolbar,
+  .strava-picker__activity-main,
+  .strava-picker__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .strava-picker__toolbar > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .strava-picker__activity dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .strava-picker__footer button {
+    width: 100%;
   }
 }
 .activities-page__link-status {

@@ -4,7 +4,7 @@ os.environ["APP_ENV"] = "test"
 os.environ["SESSION_SECRET"] = "test-secret"
 os.environ["DATABASE_URL"] = "sqlite:///./test-auth-import.db"
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -16,11 +16,11 @@ from app.auth.google import GoogleIdentity
 from app.auth.sessions import hash_token, utc_now
 from app.core.config import Settings, get_settings
 from app.database.base import Base
-from app.database.models import ActivityRecord, CyclistProfile, ExternalConnection, UserSession
+from app.database.models import ActivityRecord, CyclistProfile, ExternalConnection, User, UserSession
 from app.database.session import get_db
 from app.main import app
 from app.api.routes import auth, integrations
-from app.integrations.strava import StravaAuthorization
+from app.integrations.strava import StravaAuthorization, StravaRateLimitError, StravaTokens
 
 
 engine = create_engine(
@@ -78,10 +78,12 @@ client = TestClient(app)
 
 
 def setup_function():
+    client.cookies.clear()
     with TestingSession() as db:
         db.query(UserSession).delete()
         db.query(CyclistProfile).delete()
         db.query(ActivityRecord).delete()
+        db.query(ExternalConnection).delete()
         for table in reversed(Base.metadata.sorted_tables):
             if table.name == "users":
                 db.execute(table.delete())
@@ -162,6 +164,269 @@ def test_strava_callback_rejects_tampered_state():
     assert "connection=strava-invalid-state" in response.headers["location"]
     with TestingSession() as db:
         assert db.query(ExternalConnection).count() == 0
+
+
+def connect_test_strava(monkeypatch, *, expires_at: int = 2_000_000_000):
+    from urllib.parse import parse_qs, urlparse
+
+    client.post("/api/auth/google", json={"credential": "valid"})
+    authorization_url = client.post("/api/integrations/strava/connect").json()["authorization_url"]
+    state_value = parse_qs(urlparse(authorization_url).query)["state"][0]
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "exchange_code",
+        lambda self, code, scopes=None: StravaAuthorization(
+            athlete_id="12345",
+            athlete_name="Test Rider",
+            access_token="access-token",
+            refresh_token="refresh-token",
+            expires_at=expires_at,
+            scopes=["read", "activity:read_all"],
+        ),
+    )
+    response = client.get(
+        "/api/integrations/strava/callback",
+        params={"state": state_value, "code": "code", "scope": "read,activity:read_all"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+
+def test_strava_activity_candidates_filter_cycling_and_mark_imported(monkeypatch):
+    connect_test_strava(monkeypatch)
+    with TestingSession() as db:
+        user_id = db.scalar(select(User.id).where(User.email == "rider@example.com"))
+        assert user_id is not None
+        db.add(
+            ActivityRecord(
+                user_id=user_id,
+                title="Importada",
+                started_at=datetime(2026, 10, 20, 8),
+                sport="CYCLING",
+                duration_minutes=60,
+                source="EXTERNAL",
+                external_source_id="101",
+            )
+        )
+        db.commit()
+
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "list_athlete_activities",
+        lambda self, access_token, **kwargs: [
+            {
+                "id": 101,
+                "name": "Puerto de montaña",
+                "sport_type": "MountainBikeRide",
+                "start_date": "2026-10-20T08:00:00Z",
+                "moving_time": 3600,
+                "distance": 24500,
+                "total_elevation_gain": 820,
+                "average_watts": 205,
+                "weighted_average_watts": 228,
+                "device_watts": True,
+                "average_heartrate": 151,
+            },
+            {
+                "id": 102,
+                "name": "Rodaje virtual",
+                "sport_type": "VirtualRide",
+                "start_date": "2026-10-22T17:00:00Z",
+                "moving_time": 1800,
+                "distance": 12000,
+                "average_watts": 140,
+                "weighted_average_watts": 155,
+                "device_watts": False,
+            },
+            {
+                "id": 103,
+                "name": "Carrera",
+                "sport_type": "Run",
+                "start_date": "2026-10-23T17:00:00Z",
+                "moving_time": 1800,
+            },
+        ],
+    )
+    response = client.get(
+        "/api/integrations/strava/activities",
+        params={"start": "2026-10-01", "end": "2026-10-29", "page": 1, "limit": 20},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["external_id"] for item in body["items"]] == ["101", "102"]
+    assert body["items"][0]["already_imported"] is True
+    assert body["items"][0]["distance_km"] == 24.5
+    assert body["items"][0]["normalized_power"] == 228
+    assert body["items"][1]["average_power"] is None
+    assert body["items"][1]["normalized_power"] is None
+    assert body["has_more"] is False
+
+
+def test_strava_activity_listing_refreshes_expired_token(monkeypatch):
+    connect_test_strava(monkeypatch, expires_at=1)
+    refreshed = StravaTokens(
+        access_token="fresh-access-token",
+        refresh_token="fresh-refresh-token",
+        expires_at=2_100_000_000,
+    )
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "refresh_access_token",
+        lambda self, refresh_token: refreshed,
+    )
+
+    observed = {}
+
+    def list_activities(self, access_token, **kwargs):
+        observed["access_token"] = access_token
+        return []
+
+    monkeypatch.setattr(integrations.StravaClient, "list_athlete_activities", list_activities)
+    response = client.get(
+        "/api/integrations/strava/activities",
+        params={"start": "2026-10-01", "end": "2026-10-29"},
+    )
+    assert response.status_code == 200
+    assert observed["access_token"] == "fresh-access-token"
+    with TestingSession() as db:
+        connection = db.scalar(select(ExternalConnection))
+        assert connection is not None
+        assert "fresh-access-token" not in connection.access_token_encrypted
+        assert connection.token_expires_at == datetime.fromtimestamp(2_100_000_000, timezone.utc).replace(tzinfo=None)
+
+
+def test_strava_activity_listing_handles_missing_connection_and_rate_limit(monkeypatch):
+    client.post("/api/auth/google", json={"credential": "valid"})
+    assert client.get("/api/integrations/strava/activities").status_code == 409
+    client.cookies.clear()
+    connect_test_strava(monkeypatch)
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "list_athlete_activities",
+        lambda self, access_token, **kwargs: (_ for _ in ()).throw(StravaRateLimitError()),
+    )
+    response = client.get(
+        "/api/integrations/strava/activities",
+        params={"start": "2026-10-01", "end": "2026-10-29"},
+    )
+    assert response.status_code == 429
+    assert "límite" in response.json()["detail"]
+
+
+def test_strava_initial_sync_imports_all_cycling_activities_idempotently(monkeypatch):
+    connect_test_strava(monkeypatch)
+    with TestingSession() as db:
+        user_id = db.scalar(select(User.id).where(User.email == "rider@example.com"))
+        assert user_id is not None
+        db.add(
+            CyclistProfile(
+                user_id=user_id,
+                ftp=250,
+                weekly_hours=8,
+                available_days=["TUESDAY", "THURSDAY", "SUNDAY"],
+                modality="XCO",
+                level="INTERMEDIATE",
+                objective="PERFORMANCE",
+                timezone="Europe/Madrid",
+                onboarding_completed_at=datetime(2026, 10, 1),
+            )
+        )
+        db.commit()
+
+    summaries = [
+        {"id": 201, "sport_type": "Ride"},
+        {"id": 202, "sport_type": "MountainBikeRide"},
+        {"id": 203, "sport_type": "Run"},
+    ]
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "list_athlete_activities",
+        lambda self, access_token, **kwargs: summaries,
+    )
+
+    details = {
+        "201": {
+            "id": 201,
+            "name": "Salida con potenciómetro",
+            "sport_type": "Ride",
+            "start_date": "2026-10-20T08:00:00Z",
+            "moving_time": 3600,
+            "distance": 30000,
+            "device_watts": True,
+            "average_heartrate": 150,
+        },
+        "202": {
+            "id": 202,
+            "name": "Salida con potencia estimada",
+            "sport_type": "MountainBikeRide",
+            "start_date": "2026-10-22T08:00:00Z",
+            "moving_time": 1800,
+            "distance": 12000,
+            "device_watts": False,
+            "average_watts": 190,
+        },
+    }
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "get_activity",
+        lambda self, access_token, activity_id: details[activity_id],
+    )
+    monkeypatch.setattr(
+        integrations.StravaClient,
+        "get_activity_streams",
+        lambda self, access_token, activity_id: {
+            "time": list(range(61)),
+            "watts": [200] * 61,
+            "heartrate": [150] * 61,
+        },
+    )
+
+    response = client.post("/api/integrations/strava/sync", json={"start_date": "2026-10-01"})
+    assert response.status_code == 200
+    assert response.json()["imported"] == 2
+    assert response.json()["failed"] == 0
+    with TestingSession() as db:
+        activities = list(db.scalars(select(ActivityRecord).order_by(ActivityRecord.external_source_id)))
+        assert len(activities) == 2
+        assert activities[0].average_power == 200
+        assert activities[0].normalized_power == 200
+        assert activities[0].tss is not None
+        assert activities[1].average_power is None
+        assert activities[1].normalized_power is None
+        connection = db.scalar(select(ExternalConnection))
+        assert connection is not None
+        assert connection.sync_enabled is True
+        assert connection.sync_status == "COMPLETED"
+
+    repeated = client.post("/api/integrations/strava/sync", json={"start_date": "2026-10-01"})
+    assert repeated.status_code == 200
+    assert repeated.json()["imported"] == 0
+    assert repeated.json()["skipped"] == 2
+    with TestingSession() as db:
+        assert db.query(ActivityRecord).count() == 2
+
+
+def test_strava_initial_sync_rejects_future_date(monkeypatch):
+    connect_test_strava(monkeypatch)
+    with TestingSession() as db:
+        user_id = db.scalar(select(User.id).where(User.email == "rider@example.com"))
+        assert user_id is not None
+        db.add(
+            CyclistProfile(
+                user_id=user_id,
+                ftp=250,
+                weekly_hours=8,
+                available_days=["TUESDAY"],
+                modality="XCO",
+                level="INTERMEDIATE",
+                objective="PERFORMANCE",
+                timezone="Europe/Madrid",
+                onboarding_completed_at=datetime(2026, 10, 1),
+            )
+        )
+        db.commit()
+    response = client.post("/api/integrations/strava/sync", json={"start_date": "2027-01-01"})
+    assert response.status_code == 422
 
 
 def test_demo_cookie_is_http_only_and_session_stores_only_hash():
