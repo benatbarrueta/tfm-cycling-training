@@ -34,6 +34,10 @@ veloform.db
 data/raw/
 data/processed/*
 !data/processed/response_signal_audit.txt
+!data/processed/evaluation/
+data/processed/evaluation/*
+!data/processed/evaluation/response_ablation_cv.csv
+!data/processed/evaluation/response_ablation_summary.json
 
 # ============================================ #
 # FRONTEND

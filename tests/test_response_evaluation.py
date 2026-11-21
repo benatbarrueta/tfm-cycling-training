@@ -3,6 +3,9 @@ import pytest
 from sklearn.linear_model import LinearRegression
 
 from app.data.response_evaluation import (
+    MODEL_A_FEATURES,
+    MODEL_B_FEATURES,
+    MODEL_C_FEATURES,
     evaluate_median_baseline,
     build_response_xy,
     train_response_linear_model,
@@ -17,6 +20,8 @@ from app.data.response_evaluation import (
     train_balanced_response_linear_model,
     evaluate_personal_median_baseline,
     cross_validate_fixed_models_by_athlete,
+    cross_validate_response_ablation_by_athlete,
+    summarize_response_ablation,
 )
 
 def make_response_row(
@@ -575,3 +580,62 @@ def test_cross_validate_fixed_models_by_athlete():
         assert result["balanced_linear_mae"] >= 0
         assert result["ridge_mae"] >= 0
         assert result["forest_mae"] >= 0
+
+def test_ablation_feature_sets_are_nested():
+    assert set(MODEL_A_FEATURES) < set(MODEL_B_FEATURES)
+    assert set(MODEL_B_FEATURES) < set(MODEL_C_FEATURES)
+    assert "target_aerobic_decoupling" not in MODEL_C_FEATURES
+
+def test_cross_validate_response_ablation_uses_same_folds():
+    rows = [
+        make_response_row("athlete-a", 30, 5),
+        make_response_row("athlete-a", 60, 7),
+        make_response_row("athlete-b", 45, 6),
+        make_response_row("athlete-b", 75, 8),
+    ]
+
+    results = cross_validate_response_ablation_by_athlete(rows)
+
+    assert len(results) == 2
+    assert {result["athlete_id"] for result in results} == {
+        "athlete-a",
+        "athlete-b",
+    }
+    for result in results:
+        assert result["n_rows"] == 2
+        assert result["model_a_session_mae"] >= 0
+        assert result["model_b_session_load_mae"] >= 0
+        assert result["model_c_full_history_mae"] >= 0
+
+def test_summarize_response_ablation():
+    results = [
+        {
+            "athlete_id": "athlete-a",
+            "n_rows": 2,
+            "model_a_session_mae": 3.0,
+            "model_b_session_load_mae": 2.5,
+            "model_c_full_history_mae": 2.0,
+        },
+        {
+            "athlete_id": "athlete-b",
+            "n_rows": 3,
+            "model_a_session_mae": 4.0,
+            "model_b_session_load_mae": 4.5,
+            "model_c_full_history_mae": 3.0,
+        },
+    ]
+
+    summary = summarize_response_ablation(results)
+
+    assert summary["row_count"] == 5
+    assert summary["athlete_count"] == 2
+    assert summary["mean_mae_by_model"]["model_a_session"] == 3.5
+    comparison = summary["comparisons"][
+        "model_a_session_vs_model_c_full_history"
+    ]
+    assert comparison["mean_mae_reduction"] == 1.0
+    assert comparison["athletes_improved"] == 2
+
+def test_summarize_response_ablation_requires_results():
+    with pytest.raises(ValueError):
+        summarize_response_ablation([])

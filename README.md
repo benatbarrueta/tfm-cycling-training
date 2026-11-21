@@ -447,18 +447,22 @@ Cada ZIP debe contener:
 - Un resumen JSON del atleta.
 - Los CSV con las series temporales de las actividades.
 
-Para ejecutar la auditoría:
+Para reprocesar los ZIP locales, ejecuta la auditoría desde la raíz del
+repositorio. El patrón `data/raw/*.zip` incluye los 50 archivos de la copia
+local preparada para la presentación.
 
 ```bash
 python -u -m app.data.response_audit \
   data/raw/*.zip \
   --signal-coverage \
-  --decoupling-output data/processed/decoupling_comparisons.csv \
-  --response-output data/processed/response_dataset.csv
+  --decoupling-output /tmp/veloform-decoupling-comparisons.csv \
+  --response-output /tmp/veloform-response-dataset.csv
 ```
 
-La opción `-u` hace que Python muestre la salida inmediatamente mientras
-procesa los archivos.
+La opción `-u` muestra el progreso mientras se procesan los archivos. Las
+salidas de esta ejecución se guardan en `/tmp` para conservar los CSV de los
+experimentos ya documentados. Para entrenar en la presentación puedes usar
+directamente el [CSV ampliado ya preparado](#artefacto-del-modelo).
 
 ### Emparejamiento de actividades
 
@@ -657,15 +661,66 @@ como fallback.
 
 Random Forest no mejora los resultados y no se utiliza en el motor.
 
-## Artefacto del modelo
+### Ablación de variables A/B/C
 
-El modelo final se entrena con todas las filas elegibles:
+La hipótesis sobre la aportación del historial se evalúa manteniendo fija la
+regresión lineal equilibrada y variando únicamente las variables de entrada:
+
+- Modelo A: duración, factor de intensidad y TSS de la sesión.
+- Modelo B: Modelo A más carga acumulada y actividad de los últimos 7 y 28
+  días, ACWR y relación entre la sesión y la carga crónica.
+- Modelo C: Modelo B más mediana y número de respuestas aeróbicas anteriores.
+
+Los tres modelos usan las mismas 2.039 actividades y los mismos diez folds
+`leave-one-athlete-out`:
+
+| Configuración | MAE medio por atleta |
+|---|---:|
+| Modelo A: sesión | 6,71 |
+| Modelo B: sesión e historial de carga | 6,66 |
+| Modelo C: historial completo | **6,35** |
+
+El Modelo C reduce el MAE en 0,36 puntos respecto al Modelo A, un 5,38 %, y
+lo mejora en siete de los diez atletas. Frente al Modelo B, reduce el MAE en
+0,31 puntos y obtiene un resultado mejor en ocho atletas. La aportación de las
+variables de carga aisladas es pequeña; la mayor mejora aparece al incorporar
+también las respuestas aeróbicas anteriores.
+
+El experimento se reproduce con:
 
 ```bash
-python -m app.data.response_model \
+python -m app.data.response_evaluation \
   data/processed/response_dataset.csv \
-  --output artifacts/response_balanced_linear.json
+  --ablation
 ```
+
+La ejecución genera:
+
+- `data/processed/evaluation/response_ablation_cv.csv`, con el MAE de cada
+  configuración para cada atleta.
+- `data/processed/evaluation/response_ablation_summary.json`, con las medias,
+  diferencias relativas y número de atletas en los que mejora cada modelo.
+
+## Artefacto del modelo
+
+Para reproducir durante la presentación el entrenamiento con 50 atletas, usa
+el CSV local `data/processed/response_dataset_50.csv`, con 8.243 actividades
+elegibles de los 50 ZIP de `data/raw/`. Desde la raíz del repositorio, con el
+entorno virtual instalado:
+
+```bash
+.venv/bin/python -m app.data.response_model \
+  data/processed/response_dataset_50.csv \
+  --output /tmp/veloform-50-atletas.json
+```
+
+La salida debe indicar 8.243 filas de entrenamiento y 50 atletas. En ese mismo
+comando puedes usar `data/processed/response_dataset_expanded.csv` para el
+experimento de 30 atletas (5.808 actividades) o
+`data/processed/response_dataset.csv` para el inicial (10 atletas y 2.039
+actividades). El prototipo usa
+`artifacts/response_balanced_linear.json`. Los ZIP y los CSV locales están
+excluidos de Git.
 
 El artefacto JSON contiene:
 

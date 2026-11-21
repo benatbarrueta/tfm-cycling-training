@@ -1,0 +1,57 @@
+{
+  "row_count": 2039,
+  "athlete_count": 10,
+  "feature_sets": {
+    "model_a_session": [
+      "session_duration_minutes",
+      "session_intensity_factor",
+      "session_tss"
+    ],
+    "model_b_session_load": [
+      "session_duration_minutes",
+      "session_intensity_factor",
+      "session_tss",
+      "previous_7d_tss",
+      "previous_7d_activity_count",
+      "previous_28d_tss",
+      "previous_28d_activity_count",
+      "acute_chronic_load_ratio",
+      "session_to_chronic_load_ratio"
+    ],
+    "model_c_full_history": [
+      "session_duration_minutes",
+      "session_intensity_factor",
+      "session_tss",
+      "previous_7d_tss",
+      "previous_7d_activity_count",
+      "previous_28d_tss",
+      "previous_28d_activity_count",
+      "acute_chronic_load_ratio",
+      "session_to_chronic_load_ratio",
+      "previous_response_median",
+      "previous_response_count"
+    ]
+  },
+  "mean_mae_by_model": {
+    "model_a_session": 6.713018607506433,
+    "model_b_session_load": 6.661156950465087,
+    "model_c_full_history": 6.351849842940144
+  },
+  "comparisons": {
+    "model_a_session_vs_model_b_session_load": {
+      "mean_mae_reduction": 0.05186165704134549,
+      "relative_reduction_percent": 0.7725534528290192,
+      "athletes_improved": 4
+    },
+    "model_a_session_vs_model_c_full_history": {
+      "mean_mae_reduction": 0.36116876456628866,
+      "relative_reduction_percent": 5.380124586016092,
+      "athletes_improved": 7
+    },
+    "model_b_session_load_vs_model_c_full_history": {
+      "mean_mae_reduction": 0.30930710752494317,
+      "relative_reduction_percent": 4.643444221853189,
+      "athletes_improved": 8
+    }
+  }
+}

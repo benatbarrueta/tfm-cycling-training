@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 
 from pathlib import Path
 from statistics import median
@@ -35,6 +36,30 @@ FEATURE_COLUMNS = (
     "previous_response_median",
     "previous_response_count",
 )
+
+MODEL_A_FEATURES = (
+    "session_duration_minutes",
+    "session_intensity_factor",
+    "session_tss",
+)
+
+MODEL_B_FEATURES = (
+    *MODEL_A_FEATURES,
+    "previous_7d_tss",
+    "previous_7d_activity_count",
+    "previous_28d_tss",
+    "previous_28d_activity_count",
+    "acute_chronic_load_ratio",
+    "session_to_chronic_load_ratio",
+)
+
+MODEL_C_FEATURES = FEATURE_COLUMNS
+
+ABLATION_FEATURE_SETS = {
+    "model_a_session": MODEL_A_FEATURES,
+    "model_b_session_load": MODEL_B_FEATURES,
+    "model_c_full_history": MODEL_C_FEATURES,
+}
 
 def evaluate_median_baseline(
     train_rows: list[dict],
@@ -75,12 +100,13 @@ def evaluate_median_baseline(
 
 def build_response_xy(
     rows: list[dict],
+    feature_columns: tuple[str, ...] = FEATURE_COLUMNS,
 ) -> tuple[list[list[float]], list[float]]:
     """Construye las entradas y el objetivo del modelo de respuesta."""
     X = [
         [
             float(row[column])
-            for column in FEATURE_COLUMNS
+            for column in feature_columns
         ]
         for row in rows
     ]
@@ -94,6 +120,7 @@ def build_response_xy(
 
 def train_response_linear_model(
     train_rows: list[dict],
+    feature_columns: tuple[str, ...] = FEATURE_COLUMNS,
 ) -> LinearRegression:
     """Entrena una regresión lineal para predecir desacoplamiento."""
     if not train_rows:
@@ -102,7 +129,8 @@ def train_response_linear_model(
         )
 
     X_train, y_train = build_response_xy(
-        train_rows
+        train_rows,
+        feature_columns,
     )
 
     model = LinearRegression()
@@ -113,6 +141,7 @@ def train_response_linear_model(
 def evaluate_response_linear_model(
     model: LinearRegression,
     test_rows: list[dict],
+    feature_columns: tuple[str, ...] = FEATURE_COLUMNS,
 ) -> float:
     """Calcula el MAE de la regresión lineal."""
     if not test_rows:
@@ -121,7 +150,8 @@ def evaluate_response_linear_model(
         )
 
     X_test, y_test = build_response_xy(
-        test_rows
+        test_rows,
+        feature_columns,
     )
 
     predictions = model.predict(X_test)
@@ -393,6 +423,7 @@ def cross_validate_random_forest_configs(
 
 def train_balanced_response_linear_model(
     train_rows: list[dict],
+    feature_columns: tuple[str, ...] = FEATURE_COLUMNS,
 ) -> LinearRegression:
     """Entrena una regresión dando el mismo peso total a cada atleta."""
     if not train_rows:
@@ -401,7 +432,8 @@ def train_balanced_response_linear_model(
         )
 
     X_train, y_train = build_response_xy(
-        train_rows
+        train_rows,
+        feature_columns,
     )
 
     sample_weights = build_athlete_weights(
@@ -417,6 +449,104 @@ def train_balanced_response_linear_model(
     )
 
     return model
+
+def cross_validate_response_ablation_by_athlete(
+    rows: list[dict],
+) -> list[dict]:
+    """Evalúa A/B/C sobre exactamente los mismos folds y observaciones."""
+    results = []
+
+    for train_fold, validation_fold in build_athlete_folds(rows):
+        result = {
+            "athlete_id": validation_fold[0]["athlete_id"],
+            "n_rows": len(validation_fold),
+        }
+
+        for name, feature_columns in ABLATION_FEATURE_SETS.items():
+            model = train_balanced_response_linear_model(
+                train_fold,
+                feature_columns,
+            )
+            result[f"{name}_mae"] = evaluate_response_linear_model(
+                model,
+                validation_fold,
+                feature_columns,
+            )
+
+        results.append(result)
+
+    return results
+
+def summarize_response_ablation(
+    results: list[dict],
+) -> dict:
+    """Resume el MAE y las mejoras emparejadas de la ablación."""
+    if not results:
+        raise ValueError("Se necesitan resultados de ablación.")
+
+    keys = {
+        name: f"{name}_mae"
+        for name in ABLATION_FEATURE_SETS
+    }
+    means = {
+        name: sum(row[key] for row in results) / len(results)
+        for name, key in keys.items()
+    }
+
+    comparisons = {}
+    for left, right in (
+        ("model_a_session", "model_b_session_load"),
+        ("model_a_session", "model_c_full_history"),
+        ("model_b_session_load", "model_c_full_history"),
+    ):
+        reduction = means[left] - means[right]
+        comparisons[f"{left}_vs_{right}"] = {
+            "mean_mae_reduction": reduction,
+            "relative_reduction_percent": (
+                reduction / means[left] * 100
+            ),
+            "athletes_improved": sum(
+                row[keys[right]] < row[keys[left]]
+                for row in results
+            ),
+        }
+
+    return {
+        "row_count": sum(row["n_rows"] for row in results),
+        "athlete_count": len(results),
+        "feature_sets": {
+            name: list(columns)
+            for name, columns in ABLATION_FEATURE_SETS.items()
+        },
+        "mean_mae_by_model": means,
+        "comparisons": comparisons,
+    }
+
+def write_response_ablation_results(
+    results: list[dict],
+    summary: dict,
+    output_path: Path,
+    summary_path: Path,
+) -> None:
+    """Guarda los resultados detallados y el resumen reproducible."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = (
+        "athlete_id",
+        "n_rows",
+        "model_a_session_mae",
+        "model_b_session_load_mae",
+        "model_c_full_history_mae",
+    )
+    with output_path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(results)
+
+    with summary_path.open("w", encoding="utf-8") as file:
+        json.dump(summary, file, ensure_ascii=False, indent=2)
+        file.write("\n")
 
 def evaluate_personal_median_baseline(
     rows: list[dict],
@@ -554,6 +684,30 @@ def main():
         ),
     )
 
+    parser.add_argument(
+        "--ablation",
+        action="store_true",
+        help="Evalúa los conjuntos de variables A, B y C.",
+    )
+
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path(
+            "data/processed/evaluation/response_ablation_cv.csv"
+        ),
+        help="CSV de salida para la ablación.",
+    )
+
+    parser.add_argument(
+        "--summary-output",
+        type=Path,
+        default=Path(
+            "data/processed/evaluation/response_ablation_summary.json"
+        ),
+        help="JSON de resumen para la ablación.",
+    )
+
     args = parser.parse_args()
 
     with args.input.open(
@@ -561,6 +715,25 @@ def main():
         newline="",
     ) as file:
         rows = list(csv.DictReader(file))
+
+    if args.ablation:
+        ablation_results = cross_validate_response_ablation_by_athlete(
+            rows
+        )
+        summary = summarize_response_ablation(ablation_results)
+        write_response_ablation_results(
+            ablation_results,
+            summary,
+            args.output,
+            args.summary_output,
+        )
+
+        print("Ablación A/B/C leave-one-athlete-out:")
+        for name, mae in summary["mean_mae_by_model"].items():
+            print(f"{name}: {mae:.2f} puntos de desacoplamiento")
+        print(f"Resultados por atleta: {args.output}")
+        print(f"Resumen: {args.summary_output}")
+        return
 
     if args.full_cv:
         full_cv_results = (
